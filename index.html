@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Training Dashboard</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Training">
+<meta name="theme-color" content="#f5f4f0">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23f5f4f0'/><text y='.9em' font-size='80'>🏃</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+:root {
+  --bg:#f5f4f0; --surface:#ffffff; --surface2:#f0eeea; --surface3:#e8e6e1;
+  --border:#e2dfd8; --border2:#ccc9c0; --text:#1a1916; --muted:#7a7670; --muted2:#aaa89f;
+  --run:#22c55e; --ride:#f59e0b; --hiit:#f97316; --swim:#38bdf8; --purple:#7c3aed;
+  --shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,0.08),0 2px 4px rgba(0,0,0,0.04);
+  --radius:8px; --radius-lg:14px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+#loading-bar{position:fixed;top:0;left:0;height:3px;background:#FC4C02;width:0%;transition:width 0.3s ease;z-index:9999}
+#loading-bar.active{animation:loadpulse 1.5s ease-in-out infinite}
+@keyframes loadpulse{0%{width:20%}50%{width:70%}100%{width:90%}}
+#loading-bar.done{width:100%;transition:width 0.2s ease}
+
+#app{display:flex;min-height:100vh}
+#sidebar{width:216px;min-width:216px;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+#main{flex:1;max-width:1100px;padding:40px 48px;overflow-x:clip}
+.sidebar-logo{padding:0 20px 24px;font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.sidebar-logo span{color:#FC4C02}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:12.5px;color:var(--muted);cursor:pointer;transition:color 0.15s,background 0.15s}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--text);font-weight:500}
+.nav-item .dot{width:6px;height:6px;border-radius:50%;background:transparent;flex-shrink:0}
+.nav-item.active .dot{background:var(--text)}
+.nav-section{padding:20px 20px 6px;font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2)}
+
+#tab-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding:6px 0 env(safe-area-inset-bottom,0)}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit}
+.tab-btn.active{color:var(--text);font-weight:500}
+.tab-icon{font-size:18px;line-height:1}
+
+.page-title{font-size:22px;font-weight:300;letter-spacing:-0.02em;margin-bottom:24px}
+.section-label{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);margin-bottom:10px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 26px;box-shadow:var(--shadow)}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow)}
+.metric-label{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);margin-bottom:6px}
+.metric-value{font-family:'DM Mono',monospace;font-size:22px;font-weight:500}
+.metric-unit{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:400;color:var(--muted);margin-left:3px}
+.metric-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+.goals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.goal-card{border-radius:var(--radius-lg);padding:18px 20px;border:1px solid var(--border);transition:box-shadow 0.15s,transform 0.15s}
+.goal-card.done{border-color:#bbf7d0;background:#f0fdf4}
+.goal-card.pending{border-color:#fde68a;background:#fffbeb}
+.goal-card.clickable{cursor:pointer}
+.goal-card.clickable:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.goal-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.goal-target{font-size:11px;color:var(--muted);margin-bottom:8px}
+.goal-result{font-family:'DM Mono',monospace;font-size:20px;font-weight:500}
+.goal-result.done{color:#15803d}
+.goal-result.pending{color:#b45309}
+.goal-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:100px;margin-top:6px;font-family:'DM Mono',monospace}
+.goal-badge.done{background:#dcfce7;color:#15803d}
+.goal-badge.pending{background:#fef3c7;color:#b45309}
+
+.tp{font-family:'DM Mono',monospace;font-size:10px;border-radius:100px;padding:2px 8px;white-space:nowrap}
+.tp-run{background:#dcfce7;color:#15803d}
+.tp-ride{background:#fef3c7;color:#b45309}
+.tp-hiit{background:#ffedd5;color:#c2410c}
+.tp-swim{background:#e0f2fe;color:#0369a1}
+.tp-other{background:var(--surface2);color:var(--muted)}
+
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 26px;box-shadow:var(--shadow);margin-bottom:24px}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.chart-title{font-size:13px;font-weight:500}
+.toggle-group{display:flex;gap:2px;background:var(--surface2);border-radius:6px;padding:2px}
+.toggle-btn{font-size:11px;padding:3px 10px;border-radius:5px;color:var(--muted);transition:all 0.15s}
+.toggle-btn.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.chart-wrap{position:relative}
+
+.table-wrap{overflow-x:auto;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--surface)}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--surface2)}
+th{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);padding:10px 12px;text-align:left;font-weight:500;white-space:nowrap}
+td{padding:10px 12px;font-size:13px;border-top:1px solid var(--border);white-space:nowrap}
+tbody tr{cursor:pointer;transition:background 0.1s}
+tbody tr:hover{background:var(--surface2)}
+td.mono{font-family:'DM Mono',monospace;font-size:12px}
+
+.pills-sticky{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 0 10px;margin-bottom:4px}
+.period-pills{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+.period-pills::-webkit-scrollbar{display:none}
+.period-pill{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0}
+.period-pill.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+.period-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px}
+.type-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.type-chip{font-size:11px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);font-family:'DM Mono',monospace;background:var(--surface)}
+
+.timeline{display:flex;flex-direction:column;gap:0;padding:8px 0}
+.tl-item{display:flex;align-items:flex-start;gap:12px;padding:8px 0}
+.tl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.tl-dot.done{background:var(--run)}
+.tl-dot.upcoming{background:var(--purple)}
+.tl-name{font-size:13px;font-weight:500}
+.tl-date{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+
+/* Latest workouts */
+.latest-workout-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;transition:background 0.1s}
+.latest-workout-card:hover{background:var(--surface2)}
+.latest-workout-info{flex:1;min-width:0}
+.latest-workout-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.latest-workout-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px}
+.latest-workout-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.view-all-link{font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:20px;display:inline-block}
+.view-all-link:hover{color:var(--text)}
+
+/* Race carousel */
+.race-carousel{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:24px}
+.race-carousel::-webkit-scrollbar{display:none}
+.hyrox-card{width:280px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;transition:box-shadow 0.15s,transform 0.15s}
+.hyrox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.hyrox-card.pb{border-color:#bbf7d0;background:linear-gradient(135deg,#f0fdf4,#ffffff)}
+.hyrox-card.target-card{border-color:#ddd6fe;background:linear-gradient(135deg,#f5f3ff,#ffffff)}
+.hyrox-card.user-card{border-color:#bfdbfe;background:linear-gradient(135deg,#eff6ff,#ffffff)}
+.hyrox-race-name{font-size:14px;font-weight:600;margin-bottom:1px}
+.hyrox-date{font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace}
+.hyrox-time{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;margin-bottom:2px}
+.hyrox-time.pb-time{color:#15803d}
+.hyrox-time.target-time{color:#7c3aed}
+.hyrox-rank{font-size:11px;color:var(--muted);margin-bottom:8px}
+.hyrox-prog{height:5px;background:var(--surface3);border-radius:3px;margin-bottom:12px;overflow:hidden}
+.hyrox-prog-fill{height:100%;border-radius:3px;transition:width 0.6s ease}
+.hyrox-prog-fill.green{background:var(--run)}
+.hyrox-prog-fill.purple{background:var(--purple)}
+.hyrox-section{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);margin-bottom:3px;margin-top:8px}
+.station-badges{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px}
+.station-badge{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 7px}
+.station-badge-name{font-size:8px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted2);margin-bottom:2px}
+.station-badge-time{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;display:block}
+.station-badge-rank{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:1px;display:block}
+.runs-grid{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.run-badge{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 5px}
+.gap-badge{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:#7c3aed;margin-bottom:4px}
+.target-levers{margin-top:10px}
+.lever{font-size:11px;color:var(--muted);padding:3px 0;display:flex;align-items:center;gap:6px}
+.lever::before{content:'→';color:var(--purple)}
+
+/* Photo strip */
+.photo-strip{display:flex;gap:6px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.photo-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;cursor:pointer;flex-shrink:0;transition:opacity 0.15s}
+.photo-thumb:hover{opacity:0.8}
+.photo-add-btn{width:40px;height:40px;border-radius:6px;background:var(--surface2);border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0;transition:background 0.15s}
+.photo-add-btn:hover{background:var(--surface3)}
+.photo-camera-btn{margin-left:auto;font-size:16px;color:var(--muted);cursor:pointer;padding:4px;border-radius:4px;transition:color 0.15s}
+.photo-camera-btn:hover{color:var(--text)}
+
+/* Add race result modal */
+#add-race-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
+#add-race-overlay.open{display:flex}
+#add-race-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
+.modal-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-title{font-size:15px;font-weight:500}
+.modal-close{font-size:16px;color:var(--muted);padding:4px 8px;border-radius:6px;line-height:1}
+.modal-close:hover{background:var(--surface2);color:var(--text)}
+.modal-body{flex:1;overflow-y:auto;padding:20px}
+.race-type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:0;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:20px}
+.race-type-btn{padding:8px 0;text-align:center;font-size:13px;font-weight:500;border-radius:6px;color:var(--muted);transition:all 0.15s;cursor:pointer}
+.race-type-btn.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.form-field{margin-bottom:14px}
+.form-label{font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.07em;display:block;margin-bottom:5px}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);outline:none;transition:border-color 0.15s}
+.form-input:focus{border-color:var(--border2)}
+.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);outline:none;resize:vertical;min-height:72px;transition:border-color 0.15s}
+.form-textarea:focus{border-color:var(--border2)}
+.form-note{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.6}
+.btn-orange{width:100%;padding:10px;background:#FC4C02;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:opacity 0.15s;margin-top:4px}
+.btn-orange:hover{opacity:0.88}
+.user-badge{display:inline-block;font-size:9px;padding:2px 6px;border-radius:100px;background:#bfdbfe;color:#1d4ed8;font-family:'DM Mono',monospace;vertical-align:middle;margin-left:6px}
+
+/* Hyrox overview modal */
+#hyrox-overview-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
+#hyrox-overview-overlay.open{display:flex}
+#hyrox-overview-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
+.ov-modal-body{flex:1;overflow-y:auto;padding:20px 24px 32px}
+
+/* Races header row */
+.races-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.races-title{font-size:22px;font-weight:300;letter-spacing:-0.02em}
+.btn-add-race{padding:7px 14px;background:#FC4C02;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:opacity 0.15s}
+.btn-add-race:hover{opacity:0.88}
+
+/* Deep dive */
+#deep-dive{display:none}
+.dd-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;margin-bottom:20px;padding:6px 0}
+.dd-back:hover{color:var(--text)}
+.dd-title{font-size:20px;font-weight:500}
+.dd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px}
+.dd-desc{font-style:italic;color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.6}
+.strava-link{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:7px 14px;border-radius:6px;background:#FC4C02;color:#fff;font-weight:500;transition:opacity 0.15s}
+.strava-link:hover{opacity:0.85}
+
+/* Connect screen */
+#connect-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;text-align:center;padding:40px}
+.connect-title{font-size:24px;font-weight:300;letter-spacing:-0.02em}
+.connect-sub{font-size:14px;color:var(--muted);max-width:340px;line-height:1.6}
+.connect-btn{display:inline-flex;align-items:center;gap:10px;background:#FC4C02;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:500;cursor:pointer;transition:opacity 0.15s;font-family:inherit}
+.connect-btn:hover{opacity:0.88}
+
+.error-card{background:#fff5f5;border:1px solid #fecaca;border-radius:var(--radius);padding:16px 20px;margin-bottom:20px}
+.error-card p{font-size:13px;color:#b91c1c;margin-bottom:8px}
+.retry-btn{font-size:12px;padding:5px 12px;border-radius:6px;background:#fecaca;color:#b91c1c;border:none;cursor:pointer;font-family:inherit}
+.storage-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius);padding:10px 16px;font-size:12px;color:#b45309;margin-bottom:16px}
+
+.filter-sticky{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 0 10px;margin-bottom:4px}
+.filter-btns{display:flex;gap:6px;flex-wrap:wrap}
+.filter-btn{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace}
+.filter-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+/* Gallery */
+#gallery-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:250;align-items:flex-end;justify-content:center}
+#gallery-overlay.open{display:flex}
+#gallery-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
+.gallery-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.gallery-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.gallery-race-name{font-size:15px;font-weight:500}
+.gallery-close{font-size:16px;color:var(--muted);padding:4px 8px;border-radius:6px;line-height:1}
+.gallery-close:hover{background:var(--surface2);color:var(--text)}
+.gallery-body{flex:1;overflow-y:auto;padding:16px 20px 24px}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.gallery-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--surface2)}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;transition:opacity 0.15s;display:block}
+.gallery-thumb:hover img{opacity:0.85}
+.gallery-thumb-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s}
+.gallery-thumb:hover .gallery-thumb-del{opacity:1}
+.gallery-empty{grid-column:1/-1;text-align:center;padding:32px 16px;color:var(--muted);font-size:13px}
+.gallery-empty-icon{font-size:32px;margin-bottom:10px}
+.gallery-drop-area{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:22px 16px;text-align:center;cursor:pointer;transition:all 0.15s;display:block}
+.gallery-drop-area:hover,.gallery-drop-area.drag{border-color:var(--text);background:var(--surface2)}
+.gallery-drop-area input{display:none}
+.gallery-drop-label{font-size:13px;color:var(--muted);line-height:1.7}
+.gallery-drop-label strong{color:var(--text)}
+.gallery-drop-icon{font-size:22px;margin-bottom:6px}
+.upload-queue{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.upload-item{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.upload-item-name{flex:0 0 auto;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.upload-bar-fill{height:100%;background:#FC4C02;border-radius:2px;transition:width 0.15s}
+
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:300;align-items:center;justify-content:center}
+#lightbox.open{display:flex}
+#lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+#lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+#lightbox-close:hover{background:rgba(255,255,255,0.28)}
+#lightbox-prev,#lightbox-next{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;user-select:none}
+#lightbox-prev{left:16px}
+#lightbox-next{right:72px}
+#lightbox-prev:hover,#lightbox-next:hover{background:rgba(255,255,255,0.28)}
+#lightbox-counter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.7);font-size:12px;font-family:'DM Mono',monospace}
+
+@media(max-width:700px){
+  #lightbox-prev{left:8px}
+  #lightbox-next{right:8px}
+  .gallery-thumb-del{opacity:1}
+}
+@media(max-width:1000px){
+  #sidebar{width:180px;min-width:180px}
+  #main{padding:28px 28px}
+  .goals-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:700px){
+  #sidebar{display:none}
+  #tab-bar{display:flex}
+  #app{flex-direction:column}
+  #main{padding:16px;padding-bottom:80px;max-width:100%}
+  .goals-grid{grid-template-columns:1fr}
+  .page-title,.races-title{font-size:19px}
+  .hyrox-card{width:260px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+
+<div id="connect-screen" style="display:none">
+  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#FC4C02"/><path d="M14 24.5l6-8 5 7 5-9 4 5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="connect-title">Training Dashboard</div>
+  <div class="connect-sub">Connect your Strava account to view your training data.</div>
+  <button class="connect-btn" id="connect-btn">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+    Connect with Strava
+  </button>
+  <div id="connect-error" style="display:none;font-size:12px;color:#b91c1c;margin-top:8px"></div>
+</div>
+
+<div id="app" style="display:none">
+  <nav id="sidebar">
+    <div class="sidebar-logo">Training <span>•</span></div>
+    <div class="nav-section">Views</div>
+    <div class="nav-item active" data-view="overview"><span class="dot"></span>Overview</div>
+    <div class="nav-item" data-view="week"><span class="dot"></span>By Week</div>
+    <div class="nav-item" data-view="month"><span class="dot"></span>By Month</div>
+    <div class="nav-item" data-view="all"><span class="dot"></span>All Activities</div>
+    <div class="nav-item" data-view="races"><span class="dot"></span>Races</div>
+  </nav>
+
+  <main id="main">
+    <div id="storage-banner" style="display:none" class="storage-banner">Private browsing detected — data won't persist between sessions.</div>
+    <div id="error-container"></div>
+
+    <!-- Overview -->
+    <div id="view-overview" class="view">
+      <div class="page-title">Overview</div>
+
+      <div class="section-label">2026 Goals</div>
+      <div class="goals-grid">
+        <div class="goal-card done">
+          <div class="goal-title">Half Marathon</div>
+          <div class="goal-target">Target: sub 1:25:00</div>
+          <div class="goal-result done">1:22:00</div>
+          <span class="goal-badge done">✓ Done</span>
+        </div>
+        <div class="goal-card done">
+          <div class="goal-title">Ironman 70.3</div>
+          <div class="goal-target">Target: sub 5:00</div>
+          <div class="goal-result done">4:56:00</div>
+          <span class="goal-badge done">✓ Done</span>
+        </div>
+        <div class="goal-card pending clickable" id="goal-hyrox" onclick="openHyroxOverviewModal()">
+          <div class="goal-title">Hyrox Single <span style="font-size:10px;color:var(--muted);font-weight:400">↗ details</span></div>
+          <div class="goal-target">Target: sub 1:00</div>
+          <div class="goal-result pending">1:03:35</div>
+          <span class="goal-badge pending">-03:35 to go</span>
+        </div>
+      </div>
+
+      <div class="section-label">Latest Workouts</div>
+      <div id="latest-workouts"></div>
+      <div class="view-all-link" onclick="showView('all')">View all workouts →</div>
+
+      <div class="section-label">Year to date</div>
+      <div class="metric-grid" id="m-grid"></div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Sessions by type</div>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-chart="sessions" data-period="month">Month</button>
+            <button class="toggle-btn" data-chart="sessions" data-period="week">Week</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-sessions" height="200"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Volume by type</div>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-chart="volume" data-period="month">Month</button>
+            <button class="toggle-btn" data-chart="volume" data-period="week">Week</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-volume" height="200"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Race Timeline</div></div>
+        <div id="race-timeline" class="timeline"></div>
+      </div>
+    </div>
+
+    <!-- By Week -->
+    <div id="view-week" class="view" style="display:none">
+      <div class="page-title">By Week</div>
+      <div class="pills-sticky">
+        <div id="week-pills" class="period-pills"></div>
+      </div>
+      <div id="week-stats" class="period-stats"></div>
+      <div id="week-chips" class="type-chips"></div>
+      <div class="table-wrap"><table><thead id="week-thead"></thead><tbody id="week-tbody"></tbody></table></div>
+    </div>
+
+    <!-- By Month -->
+    <div id="view-month" class="view" style="display:none">
+      <div class="page-title">By Month</div>
+      <div class="pills-sticky">
+        <div id="month-pills" class="period-pills"></div>
+      </div>
+      <div id="month-stats" class="period-stats"></div>
+      <div id="month-chips" class="type-chips"></div>
+      <div class="table-wrap"><table><thead id="month-thead"></thead><tbody id="month-tbody"></tbody></table></div>
+    </div>
+
+    <!-- All Activities -->
+    <div id="view-all" class="view" style="display:none">
+      <div class="page-title">All Activities</div>
+      <div class="filter-sticky">
+        <div class="filter-btns" id="all-filters">
+          <button class="filter-btn active" data-type="All">All</button>
+          <button class="filter-btn" data-type="Run">Run</button>
+          <button class="filter-btn" data-type="Ride">Ride</button>
+          <button class="filter-btn" data-type="HIIT">HIIT</button>
+          <button class="filter-btn" data-type="Swim">Swim</button>
+        </div>
+      </div>
+      <div id="all-stats" class="period-stats"></div>
+      <div id="all-chips" class="type-chips"></div>
+      <div class="table-wrap"><table><thead id="all-thead"></thead><tbody id="all-tbody"></tbody></table></div>
+    </div>
+
+    <!-- Races -->
+    <div id="view-races" class="view" style="display:none">
+      <div class="races-header">
+        <div class="races-title">Races</div>
+        <button class="btn-add-race" id="open-add-race-btn">+ Add Race Result</button>
+      </div>
+      <div id="race-carousel" class="race-carousel"></div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Finish time progression</div></div>
+        <div class="chart-wrap"><canvas id="chart-races-time" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Station comparison</div></div>
+        <div class="chart-wrap"><canvas id="chart-stations" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Run comparison</div></div>
+        <div class="chart-wrap"><canvas id="chart-runs" height="200"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Deep Dive -->
+    <div id="deep-dive">
+      <div class="dd-back" id="dd-back">← Back</div>
+      <div id="dd-content"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Hyrox overview modal -->
+<div id="hyrox-overview-overlay">
+  <div id="hyrox-overview-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Hyrox Progress</div>
+      <button class="modal-close" id="hyrox-ov-close">✕</button>
+    </div>
+    <div class="ov-modal-body" id="hyrox-ov-body">
+      <div id="ov-carousel" class="race-carousel" style="margin-bottom:20px"></div>
+      <div class="chart-card" style="margin-bottom:16px">
+        <div class="chart-header"><div class="chart-title">Finish time progression</div></div>
+        <div class="chart-wrap"><canvas id="chart-ov-hyrox-time" height="180"></canvas></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:16px">
+        <div class="chart-header"><div class="chart-title">Station comparison</div></div>
+        <div class="chart-wrap"><canvas id="chart-ov-stations" height="180"></canvas></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0">
+        <div class="chart-header"><div class="chart-title">Run comparison</div></div>
+        <div class="chart-wrap"><canvas id="chart-ov-runs" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Race Result modal -->
+<div id="add-race-overlay">
+  <div id="add-race-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Add Race Result</div>
+      <button class="modal-close" id="add-race-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="race-type-toggle">
+        <div class="race-type-btn active" data-rtype="hyrox">Hyrox Race</div>
+        <div class="race-type-btn" data-rtype="other">Other Race</div>
+      </div>
+      <div id="hyrox-race-fields">
+        <div class="form-field">
+          <label class="form-label">Results URL</label>
+          <input class="form-input" id="hr-url" type="url" placeholder="Paste results.hyrox.com link">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Date</label>
+          <input class="form-input" id="hr-date" type="date">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="hr-notes" placeholder="Any notes about the race..."></textarea>
+        </div>
+        <button class="btn-orange" id="save-hyrox-race">Save Race</button>
+        <div class="form-note">Splits and rankings will be populated when you share the link with Claude.</div>
+      </div>
+      <div id="other-race-fields" style="display:none">
+        <div class="form-field">
+          <label class="form-label">Race Name</label>
+          <input class="form-input" id="or-name" type="text" placeholder="e.g. Paris Marathon">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Results URL (optional)</label>
+          <input class="form-input" id="or-url" type="url" placeholder="Paste results link">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Date</label>
+          <input class="form-input" id="or-date" type="date">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Finish Time</label>
+          <input class="form-input" id="or-time" type="text" placeholder="e.g. 1:22:00">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Notes (optional)</label>
+          <textarea class="form-textarea" id="or-notes" placeholder="Any notes about the race..."></textarea>
+        </div>
+        <button class="btn-orange" id="save-other-race">Save Race</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gallery overlay -->
+<div id="gallery-overlay">
+  <div id="gallery-modal">
+    <div class="gallery-handle"></div>
+    <div class="gallery-header">
+      <div class="gallery-race-name" id="gallery-title"></div>
+      <button class="gallery-close" id="gallery-close-btn">✕</button>
+    </div>
+    <div class="gallery-body">
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <label class="gallery-drop-area" id="gallery-drop-area">
+        <input type="file" id="gallery-file-input" accept="image/*" multiple>
+        <div class="gallery-drop-icon">📷</div>
+        <div class="gallery-drop-label"><strong>Tap to add photos</strong><br>or drag and drop here</div>
+      </label>
+      <div id="upload-queue" class="upload-queue"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close">✕</button>
+  <button id="lightbox-prev">‹</button>
+  <img id="lightbox-img" src="" alt="">
+  <button id="lightbox-next">›</button>
+  <div id="lightbox-counter"></div>
+</div>
+
+<!-- Bottom tab bar -->
+<div id="tab-bar">
+  <button class="tab-btn active" data-view="overview"><span class="tab-icon">⊞</span>Overview</button>
+  <button class="tab-btn" data-view="week"><span class="tab-icon">📅</span>Week</button>
+  <button class="tab-btn" data-view="month"><span class="tab-icon">📆</span>Month</button>
+  <button class="tab-btn" data-view="all"><span class="tab-icon">≡</span>All</button>
+  <button class="tab-btn" data-view="races"><span class="tab-icon">🏅</span>Races</button>
+</div>
+
+<script>
+// Personal dashboard — credentials intentionally embedded
+const CLIENT_ID = '250798';
+const CLIENT_SECRET = 'f26dfafbfd9a57cfd7cef57bef304ef2cb4206f2';
+const REDIRECT_URI = 'https://daviddamjakob-claude.github.io/training-dashboard-v2';
+const CLOUDINARY_CLOUD = 'dglx8phdf';
+const CLOUDINARY_PRESET = 'claude_strava_dashboard';
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const START_DATE = new Date('2026-01-01T00:00:00Z');
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+let memStore = {};
+let useLocalStorage = true;
+try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); } catch(e){ useLocalStorage=false; }
+const store = {
+  get(k){ try{ return useLocalStorage ? localStorage.getItem(k) : (memStore[k]||null); }catch(e){ return memStore[k]||null; } },
+  set(k,v){ try{ if(useLocalStorage) localStorage.setItem(k,v); else memStore[k]=v; }catch(e){ memStore[k]=v; } },
+  del(k){ try{ if(useLocalStorage) localStorage.removeItem(k); else delete memStore[k]; }catch(e){ delete memStore[k]; } }
+};
+if(!useLocalStorage) document.getElementById('storage-banner').style.display='block';
+
+// ── Loading bar ──────────────────────────────────────────────────────────────
+const lb = document.getElementById('loading-bar');
+function loadStart(){ lb.className='active'; }
+function loadDone(){ lb.className='done'; setTimeout(()=>{ lb.className=''; lb.style.width=''; },400); }
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function getTokens(){ const r=store.get('strava_tokens'); return r?JSON.parse(r):null; }
+function saveTokens(t){ store.set('strava_tokens',JSON.stringify(t)); }
+function clearTokens(){ store.del('strava_tokens'); }
+
+async function ensureValidToken(){
+  let t=getTokens();
+  if(!t) return null;
+  if(Date.now()/1000 < t.expires_at-60) return t.access_token;
+  const res=await fetch('https://www.strava.com/oauth/token',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({client_id:CLIENT_ID,client_secret:CLIENT_SECRET,refresh_token:t.refresh_token,grant_type:'refresh_token'})
+  });
+  if(!res.ok){ clearTokens(); return null; }
+  const d=await res.json();
+  saveTokens({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:d.expires_at});
+  return d.access_token;
+}
+
+async function exchangeCode(code){
+  const res=await fetch('https://www.strava.com/oauth/token',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({client_id:CLIENT_ID,client_secret:CLIENT_SECRET,code,grant_type:'authorization_code'})
+  });
+  if(!res.ok) throw new Error('Token exchange failed: '+res.status);
+  const d=await res.json();
+  saveTokens({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:d.expires_at});
+  return d.access_token;
+}
+
+// ── Activity mapping ─────────────────────────────────────────────────────────
+function mapType(t){
+  if(['Run','TrailRun','VirtualRun'].includes(t)) return 'Run';
+  if(['Ride','VirtualRide','EBikeRide','Velomobile'].includes(t)) return 'Ride';
+  if(['Swim'].includes(t)) return 'Swim';
+  if(['WeightTraining','Workout','HighIntensityIntervalTraining','CrossFit','Elliptical','StairStepper'].includes(t)) return 'HIIT';
+  return 'Other';
+}
+function formatPace(movingTime,dist){
+  if(!dist||dist<10) return null;
+  const spk=movingTime/(dist/1000), m=Math.floor(spk/60), s=Math.round(spk%60).toString().padStart(2,'0');
+  return `${m}:${s}/km`;
+}
+function mapActivity(a){
+  const type=mapType(a.type||a.sport_type||'');
+  return {
+    id:a.id, name:a.name, type,
+    date:(a.start_date_local||'').slice(0,10),
+    duration:Math.round((a.moving_time||0)/60),
+    distKm:+((a.distance||0)/1000).toFixed(2),
+    hr:a.average_heartrate||0, maxHr:a.max_heartrate||0,
+    pace:(type==='Run'&&a.distance>0)?formatPace(a.moving_time,a.distance):null,
+    elev:a.total_elevation_gain||0,
+    cal:a.kilojoules?Math.round(a.kilojoules*0.239):0,
+    desc:a.description||'', race:a.workout_type===1
+  };
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+let activities = [];
+
+async function fetchAllActivities(token){
+  const cached=store.get('activities_cache');
+  if(cached){ const {ts,data}=JSON.parse(cached); if(Date.now()-ts<CACHE_TTL_MS) return data; }
+  const after=Math.floor(START_DATE.getTime()/1000);
+  let page=1, all=[];
+  while(true){
+    const res=await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=200&page=${page}`,
+      {headers:{'Authorization':'Bearer '+token}});
+    if(!res.ok) throw new Error('Activities fetch failed: '+res.status);
+    const batch=await res.json();
+    if(!batch.length) break;
+    all=all.concat(batch);
+    if(batch.length<200) break;
+    page++;
+  }
+  const mapped=all.map(mapActivity);
+  store.set('activities_cache',JSON.stringify({ts:Date.now(),data:mapped}));
+  return mapped;
+}
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+function fmtDuration(mins){ if(mins<60) return mins+'m'; const h=Math.floor(mins/60),m=mins%60; return m?`${h}h ${m}m`:`${h}h`; }
+function fmtHours(mins){ return (mins/60).toFixed(1); }
+function weekday(ds){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(ds+'T12:00:00').getDay()]; }
+function fmtDate(ds){ return new Date(ds+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function typePill(t){ return `<span class="tp tp-${t.toLowerCase()}">${t}</span>`; }
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+const charts = {};
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+const TYPE_COLORS={Run:'#22c55e',Ride:'#f59e0b',HIIT:'#f97316',Swim:'#38bdf8'};
+
+function buildStackedBar(canvasId,labels,datasets,opts={}){
+  destroyChart(canvasId);
+  const ctx=document.getElementById(canvasId);
+  if(!ctx) return;
+  const totals=labels.map((_,i)=>datasets.reduce((s,ds)=>s+(ds.data[i]||0),0));
+  const maxTotal=Math.max(...totals,1);
+  const yMax=Math.ceil(maxTotal*1.18);
+  const datalabelPlugin={
+    id:'customTotals',
+    afterDatasetsDraw(chart){
+      const {ctx:c}=chart;
+      c.save();
+      chart.data.labels.forEach((_,i)=>{
+        const meta=chart.getDatasetMeta(chart.data.datasets.length-1);
+        const bar=meta.data[i]; if(!bar) return;
+        const total=totals[i]; if(!total) return;
+        const label=opts.isVolume?fmtHours(total)+'h':total.toString();
+        c.fillStyle='#374151'; c.font='600 11px DM Sans,sans-serif'; c.textAlign='center';
+        c.fillText(label,bar.x,bar.y-6);
+      });
+      c.restore();
+    }
+  };
+  charts[canvasId]=new Chart(ctx,{
+    type:'bar', plugins:[ChartDataLabels,datalabelPlugin],
+    data:{
+      labels,
+      datasets:datasets.map(ds=>({
+        ...ds, stack:'stack', borderRadius:3,
+        datalabels:{
+          display(context){ const v=context.dataset.data[context.dataIndex]||0; return opts.isVolume?v>=60:v>=(opts.weekly?1:2); },
+          color:'#fff', font:{size:10,family:'DM Mono,monospace',weight:'500'},
+          formatter(v){ if(opts.isVolume){ if(v>=60) return Math.round(v/60)+'h'; return Math.round(v)+'m'; } return v; },
+          anchor:'center', align:'center'
+        }
+      }))
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      interaction:{mode:'nearest',intersect:true},
+      plugins:{
+        legend:{display:true,labels:{color:'#6b7280',font:{size:11},boxWidth:12,padding:16}},
+        tooltip:{callbacks:{
+          title(items){ return items[0]?.dataset?.label||''; },
+          label(ctx){ const v=ctx.raw; return opts.isVolume?` ${fmtDuration(v)}`:`  ${v} sessions`; }
+        }}
+      },
+      scales:{
+        x:{stacked:true,grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}},
+        y:{stacked:true,display:false,max:yMax}
+      }
+    }
+  });
+}
+
+function getWeekKey(ds){
+  const d=new Date(ds+'T12:00:00'), day=d.getDay(), diff=d.getDate()-day+(day===0?-6:1);
+  const mon=new Date(d); mon.setDate(diff); return mon.toISOString().slice(0,10);
+}
+function getMonthKey(ds){ return ds.slice(0,7); }
+function groupByPeriod(acts,keyFn){ const m={}; acts.forEach(a=>{ const k=keyFn(a.date); if(!m[k]) m[k]=[]; m[k].push(a); }); return m; }
+
+function periodChartData(acts,keyFn,labelFn,isVolume){
+  const types=['Run','Ride','HIIT','Swim'];
+  const grouped=groupByPeriod(acts.filter(a=>types.includes(a.type)),keyFn);
+  const keys=Object.keys(grouped).sort();
+  const labels=keys.map(labelFn);
+  const datasets=types.map(t=>({
+    label:t, backgroundColor:TYPE_COLORS[t],
+    data:keys.map(k=>{ const arr=(grouped[k]||[]).filter(a=>a.type===t); return isVolume?arr.reduce((s,a)=>s+a.duration,0):arr.length; })
+  }));
+  return {labels,datasets,keys};
+}
+function monthLabel(k){ const [y,m]=k.split('-'); return new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'short'}); }
+function weekLabel(k){ return new Date(k+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+
+// ── Hyrox data ────────────────────────────────────────────────────────────────
+const HYROX_RACES = [
+  {
+    name:'Poznan', date:'Dec 2025', time:'1:11:39', timeSecs:71*60+39,
+    rank:'#160/1184', ag:'#42', pb:false, target:false,
+    runTotal:'35:45', runRank:'#172', roxzone:'6:32', rxRank:'#731',
+    stations:[
+      {name:'SkiErg',time:'4:12',rank:'#50'},{name:'Sled Push',time:'2:03',rank:'#22'},
+      {name:'Sled Pull',time:'3:48',rank:'#167'},{name:'Burpee BJ',time:'3:33',rank:'#60'},
+      {name:'Row',time:'4:33',rank:'#163'},{name:'Farmers Carry',time:'1:40',rank:'#133'},
+      {name:'Lunges',time:'3:29',rank:'#52'},{name:'Wall Balls',time:'6:09',rank:'#467'}
+    ],
+    runs:['3:49','3:55','4:38','4:28','4:38','4:46','4:36','4:99'],
+    progress:62
+  },
+  {
+    name:'Lisbon', date:'2 May 2026', time:'1:05:09', timeSecs:65*60+9,
+    rank:'#30 M/W', ag:'#10', pb:true, target:false,
+    runTotal:'31:42', runRank:'#23', roxzone:'5:01', rxRank:'#222',
+    stations:[
+      {name:'SkiErg',time:'4:04',rank:'#26'},{name:'Sled Push',time:'2:09',rank:'#17'},
+      {name:'Sled Pull',time:'3:47',rank:'#80'},{name:'Burpee BJ',time:'3:02',rank:'#16'},
+      {name:'Row',time:'4:17',rank:'#32'},{name:'Farmers Carry',time:'1:57',rank:'#216'},
+      {name:'Lunges',time:'3:43',rank:'#75'},{name:'Wall Balls',time:'5:31',rank:'#188'}
+    ],
+    runs:['3:09','3:52','4:01','4:01','4:14','4:00','4:09','4:21'],
+    progress:78
+  },
+  {
+    name:'Barcelona', date:'15 May 2026', time:'1:03:35', timeSecs:63*60+35,
+    rank:'#14 M/W', ag:'#5', pb:true, target:false,
+    runTotal:'31:58', runRank:'#22', roxzone:'5:09', rxRank:'#110',
+    stations:[
+      {name:'SkiErg',time:'4:07',rank:'#10'},{name:'Sled Push',time:'2:10',rank:'#4'},
+      {name:'Sled Pull',time:'3:36',rank:'#49'},{name:'Burpee BJ',time:'2:41',rank:'#4'},
+      {name:'Row',time:'4:00',rank:'#1'},{name:'Farmers Carry',time:'1:49',rank:'#131'},
+      {name:'Lunges',time:'3:20',rank:'#30'},{name:'Wall Balls',time:'4:50',rank:'#56'}
+    ],
+    runs:['3:47','3:48','4:01','4:08','4:06','4:04','3:59','4:09'],
+    progress:84
+  },
+  {
+    name:'Berlin', date:'30 May 2026', time:'sub 1:00', timeSecs:60*60,
+    rank:'Target race', ag:'', pb:false, target:true,
+    gap:'-03:35',
+    levers:['Roxzone sub 3:30','Run pace sub 3:55/km','Wall Balls sub 4:30','Farmers Carry sub 1:35'],
+    progress:100
+  }
+];
+
+// Display order: Berlin (target/next), Barcelona (most recent PB), Lisbon, Poznan
+function getRacesDisplayOrder(){
+  const userRaces = loadUserRaces();
+  const ordered = [
+    HYROX_RACES.find(r=>r.name==='Berlin'),
+    HYROX_RACES.find(r=>r.name==='Barcelona'),
+    HYROX_RACES.find(r=>r.name==='Lisbon'),
+    HYROX_RACES.find(r=>r.name==='Poznan')
+  ];
+  return [...userRaces.map(r=>({...r,isUser:true})), ...ordered];
+}
+
+function parseTime(t){ if(!t) return 0; const parts=(t||'0:0').split(':').map(Number); return parts.length===2?parts[0]*60+parts[1]:0; }
+
+// ── Photo helpers ─────────────────────────────────────────────────────────────
+function galleryKey(race){ return 'gallery_'+race; }
+function loadPhotos(race){ const r=store.get(galleryKey(race)); return r?JSON.parse(r):[]; }
+function savePhotos(race,photos){ store.set(galleryKey(race),JSON.stringify(photos)); }
+
+function photoStripHtml(raceName){
+  const photos=loadPhotos(raceName).slice(0,4);
+  const thumbs=photos.map((p,i)=>{
+    const thumb=`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/w_80,h_80,c_fill/${p.public_id}`;
+    return `<img class="photo-thumb" src="${thumb}" data-race="${raceName}" data-index="${i}" loading="lazy" alt="photo">`;
+  }).join('');
+  const addBtn=photos.length===0?`<button class="photo-add-btn" data-race="${raceName}" title="Add photos">📷</button>`:'';
+  return `<div class="photo-strip">
+    ${thumbs}
+    ${addBtn}
+    <button class="photo-camera-btn" data-race="${raceName}" title="Manage photos">📷</button>
+  </div>`;
+}
+
+// ── Race card HTML ────────────────────────────────────────────────────────────
+function raceCardHtml(r){
+  if(r.isUser){
+    const isHyrox=r.raceType==='hyrox';
+    return `<div class="hyrox-card user-card" data-race="${r.name}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <div class="hyrox-race-name">${r.name}</div>
+        <span class="user-badge">User</span>
+      </div>
+      <div class="hyrox-date">${r.date||''}</div>
+      ${r.time?`<div class="hyrox-time" style="font-size:20px">${r.time}</div>`:''}
+      ${r.notes?`<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">${r.notes}</div>`:''}
+      ${r.url?`<a href="${r.url}" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:#FC4C02">View results ↗</a>`:''}
+      ${isHyrox?`<div class="form-note" style="margin-top:8px">Share the link with Claude to populate splits.</div>`:''}
+      ${photoStripHtml(r.name)}
+    </div>`;
+  }
+  if(r.target){
+    return `<div class="hyrox-card target-card" data-race="${r.name}">
+      <div class="hyrox-race-name">${r.name}</div>
+      <div class="hyrox-date">${r.date}</div>
+      <div class="hyrox-time target-time">${r.time}</div>
+      <div class="hyrox-rank">Target race · Next up</div>
+      <div class="hyrox-prog"><div class="hyrox-prog-fill purple" style="width:${r.progress}%"></div></div>
+      <div class="gap-badge">${r.gap}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Gap to target</div>
+      <div class="target-levers">${r.levers.map(l=>`<div class="lever">${l}</div>`).join('')}</div>
+      ${photoStripHtml(r.name)}
+    </div>`;
+  }
+  return `<div class="hyrox-card ${r.pb?'pb':''}" data-race="${r.name}">
+    <div class="hyrox-race-name">${r.name}</div>
+    <div class="hyrox-date">${r.date}</div>
+    <div class="hyrox-time ${r.pb?'pb-time':''}">${r.time}</div>
+    <div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>
+    <div class="hyrox-prog"><div class="hyrox-prog-fill green" style="width:${r.progress}%"></div></div>
+    <div class="hyrox-section">Run & Roxzone</div>
+    <div class="station-badges">
+      <div class="station-badge"><div class="station-badge-name">Run Total</div><span class="station-badge-time">${r.runTotal}</span><span class="station-badge-rank">${r.runRank}</span></div>
+      <div class="station-badge"><div class="station-badge-name">Roxzone</div><span class="station-badge-time">${r.roxzone}</span><span class="station-badge-rank">${r.rxRank}</span></div>
+    </div>
+    <div class="hyrox-section">Stations</div>
+    <div class="station-badges">${r.stations.map(s=>`<div class="station-badge"><div class="station-badge-name">${s.name}</div><span class="station-badge-time">${s.time}</span><span class="station-badge-rank">${s.rank}</span></div>`).join('')}</div>
+    <div class="hyrox-section">Runs</div>
+    <div class="runs-grid">${r.runs.map(t=>`<span class="run-badge">${t}</span>`).join('')}</div>
+    ${photoStripHtml(r.name)}
+  </div>`;
+}
+
+function wireCarouselEvents(containerEl){
+  containerEl.querySelectorAll('.photo-thumb').forEach(img=>{
+    img.addEventListener('click',e=>{
+      e.stopPropagation();
+      const race=img.dataset.race, idx=+img.dataset.index;
+      openLightbox(loadPhotos(race),idx);
+    });
+  });
+  containerEl.querySelectorAll('.photo-add-btn,.photo-camera-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      openGallery(btn.dataset.race);
+    });
+  });
+}
+
+// ── Hyrox charts ──────────────────────────────────────────────────────────────
+function buildHyroxCharts(timeId,stationsId,runsId){
+  // Time progression
+  destroyChart(timeId);
+  const ctxT=document.getElementById(timeId);
+  if(ctxT){
+    const raceData=[
+      {label:'Poznan',secs:71*60+39,color:'#9ca3af'},
+      {label:'Lisbon',secs:65*60+9,color:'#22c55e'},
+      {label:'Barcelona',secs:63*60+35,color:'#22c55e'},
+      {label:'Berlin (goal)',secs:60*60,color:'#7c3aed'}
+    ];
+    charts[timeId]=new Chart(ctxT,{
+      type:'line', plugins:[ChartDataLabels],
+      data:{
+        labels:raceData.map(d=>d.label),
+        datasets:[{
+          data:raceData.map(d=>d.secs),
+          borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.08)',
+          fill:true, tension:0.3,
+          pointBackgroundColor:raceData.map(d=>d.color),
+          pointBorderColor:raceData.map(d=>d.color),
+          pointRadius:6,
+          datalabels:{
+            display:true, color:raceData.map(d=>d.color),
+            font:{family:'DM Mono,monospace',size:11,weight:'500'},
+            anchor:'end', align:'top', offset:4,
+            formatter(v){ const m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return `${m}:${s}`; }
+          }
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:true,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{reverse:true,min:58*60,max:73*60,
+            ticks:{color:'#9ca3af',font:{size:10},callback(v){ const m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return `${m}:${s}`; }},
+            grid:{color:'rgba(0,0,0,0.05)'}},
+          x:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}}
+        }
+      }
+    });
+  }
+  // Stations
+  const stationNames=['SkiErg','Sled Push','Sled Pull','Burpee BJ','Row','Farmers Carry','Lunges','Wall Balls'];
+  const completedRaces=HYROX_RACES.filter(r=>!r.target);
+  destroyChart(stationsId);
+  const ctxS=document.getElementById(stationsId);
+  if(ctxS){
+    charts[stationsId]=new Chart(ctxS,{
+      type:'bar', plugins:[ChartDataLabels],
+      data:{
+        labels:stationNames.map(n=>n.replace(' ','\n')),
+        datasets:completedRaces.map((r,i)=>({
+          label:r.name,
+          backgroundColor:i===0?'#d1d5db':i===1?'#86efac':'#22c55e',
+          data:stationNames.map(n=>{ const st=r.stations.find(s=>s.name===n); return st?parseTime(st.time):0; }),
+          datalabels:{display:false}
+        }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:true,
+        plugins:{
+          legend:{display:true,labels:{color:'#6b7280',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label(ctx){ const v=ctx.raw,m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return ` ${ctx.dataset.label}: ${m}:${s}`; }}}
+        },
+        scales:{
+          x:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}},
+          y:{ticks:{color:'#9ca3af',font:{size:10},callback(v){ const m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return `${m}:${s}`; }},grid:{color:'rgba(0,0,0,0.05)'}}
+        }
+      }
+    });
+  }
+  // Runs
+  destroyChart(runsId);
+  const ctxR=document.getElementById(runsId);
+  if(ctxR){
+    const runLabels=['Run 1','Run 2','Run 3','Run 4','Run 5','Run 6','Run 7','Run 8','Roxzone'];
+    charts[runsId]=new Chart(ctxR,{
+      type:'bar', plugins:[ChartDataLabels],
+      data:{
+        labels:runLabels,
+        datasets:completedRaces.map((r,i)=>({
+          label:r.name,
+          backgroundColor:i===0?'#d1d5db':i===1?'#86efac':'#22c55e',
+          data:[...r.runs.map(t=>parseTime(t)),parseTime(r.roxzone)],
+          datalabels:{display:false}
+        }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:true,
+        plugins:{
+          legend:{display:true,labels:{color:'#6b7280',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label(ctx){ const v=ctx.raw,m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return ` ${ctx.dataset.label}: ${m}:${s}`; }}}
+        },
+        scales:{
+          x:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}},
+          y:{ticks:{color:'#9ca3af',font:{size:10},callback(v){ const m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return `${m}:${s}`; }},grid:{color:'rgba(0,0,0,0.05)'}}
+        }
+      }
+    });
+  }
+}
+
+// ── Hyrox overview modal ──────────────────────────────────────────────────────
+function openHyroxOverviewModal(){
+  const overlay=document.getElementById('hyrox-overview-overlay');
+  overlay.classList.add('open');
+  document.body.style.overflow='hidden';
+  // Populate carousel
+  const carousel=document.getElementById('ov-carousel');
+  const displayRaces=[
+    HYROX_RACES.find(r=>r.name==='Berlin'),
+    HYROX_RACES.find(r=>r.name==='Barcelona'),
+    HYROX_RACES.find(r=>r.name==='Lisbon'),
+    HYROX_RACES.find(r=>r.name==='Poznan')
+  ];
+  carousel.innerHTML=displayRaces.map(raceCardHtml).join('');
+  wireCarouselEvents(carousel);
+  // Build charts (destroy first to recreate)
+  setTimeout(()=>{
+    buildHyroxCharts('chart-ov-hyrox-time','chart-ov-stations','chart-ov-runs');
+  },50);
+}
+
+document.getElementById('hyrox-ov-close').addEventListener('click',()=>{
+  document.getElementById('hyrox-overview-overlay').classList.remove('open');
+  document.body.style.overflow='';
+});
+document.getElementById('hyrox-overview-overlay').addEventListener('click',e=>{
+  if(e.target.id==='hyrox-overview-overlay'){
+    document.getElementById('hyrox-overview-overlay').classList.remove('open');
+    document.body.style.overflow='';
+  }
+});
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+let sessionsChartPeriod='month', volumeChartPeriod='month';
+
+function renderOverview(){
+  // Latest workouts (3 most recent)
+  const sorted=[...activities].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+  const lwEl=document.getElementById('latest-workouts');
+  if(!sorted.length){
+    lwEl.innerHTML='<div style="color:var(--muted);font-size:13px;margin-bottom:8px">No activities yet.</div>';
+  } else {
+    lwEl.innerHTML=sorted.map(a=>`
+      <div class="latest-workout-card" data-id="${a.id}">
+        ${typePill(a.type)}
+        <div class="latest-workout-info">
+          <div class="latest-workout-name">${a.name}</div>
+          <div class="latest-workout-meta">${fmtDate(a.date)} &nbsp;·&nbsp; ${fmtDuration(a.duration)}${a.distKm>0?' &nbsp;·&nbsp; '+a.distKm.toFixed(1)+' km':''}</div>
+        </div>
+      </div>
+    `).join('');
+    lwEl.querySelectorAll('.latest-workout-card').forEach(card=>{
+      card.addEventListener('click',()=>openDeepDive(card.dataset.id));
+    });
+  }
+
+  // Year to date metrics
+  const typeList=['Run','Ride','HIIT','Swim'];
+  document.getElementById('m-grid').innerHTML=typeList.map(t=>{
+    const acts=activities.filter(a=>a.type===t);
+    const hours=fmtHours(acts.reduce((s,a)=>s+a.duration,0));
+    return `<div class="metric-card">
+      <div class="metric-label">${t}</div>
+      <div class="metric-value">${acts.length}<span class="metric-unit">sessions</span></div>
+      <div class="metric-sub">${hours}h training</div>
+    </div>`;
+  }).join('');
+
+  renderSessionsChart();
+  renderVolumeChart();
+
+  // Race timeline
+  const races=[
+    {name:'Berlin Half Marathon',date:'29 Mar 2026',done:true},
+    {name:'Ironman 70.3 Lanzarote',date:'19 Apr 2026',done:true},
+    {name:'Hyrox Lisbon',date:'2 May 2026',done:true},
+    {name:'Hyrox Barcelona',date:'15 May 2026',done:true},
+    {name:'Hyrox Berlin',date:'30 May 2026',done:false}
+  ];
+  const tl=document.getElementById('race-timeline');
+  tl.innerHTML=races.map((r,i)=>`
+    <div class="tl-item">
+      <div style="display:flex;flex-direction:column;align-items:center;width:12px;flex-shrink:0">
+        <div class="tl-dot ${r.done?'done':'upcoming'}"></div>
+        ${i<races.length-1?`<div style="width:2px;height:32px;background:var(--border2);margin-top:2px"></div>`:''}
+      </div>
+      <div style="padding-bottom:${i<races.length-1?'8':'0'}px">
+        <div class="tl-name">${r.name}</div>
+        <div class="tl-date">${r.date}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSessionsChart(){
+  const isWeek=sessionsChartPeriod==='week';
+  const {labels,datasets}=isWeek
+    ?periodChartData(activities,getWeekKey,weekLabel,false)
+    :periodChartData(activities,getMonthKey,monthLabel,false);
+  buildStackedBar('chart-sessions',labels,datasets,{weekly:isWeek});
+}
+function renderVolumeChart(){
+  const isWeek=volumeChartPeriod==='week';
+  const {labels,datasets}=isWeek
+    ?periodChartData(activities,getWeekKey,weekLabel,true)
+    :periodChartData(activities,getMonthKey,monthLabel,true);
+  buildStackedBar('chart-volume',labels,datasets,{isVolume:true,weekly:isWeek});
+}
+
+// ── Week / Month views ────────────────────────────────────────────────────────
+function tableHeader(id){
+  document.getElementById(id).innerHTML='<tr><th>Day</th><th>Date</th><th>Type</th><th>Name</th><th>Duration</th><th>Distance</th><th>HR</th></tr>';
+}
+function activityRows(acts,tbodyId){
+  const tbody=document.getElementById(tbodyId);
+  // Descending date sort
+  const sorted=[...acts].sort((a,b)=>b.date.localeCompare(a.date));
+  tbody.innerHTML=sorted.map(a=>`
+    <tr data-id="${a.id}">
+      <td class="mono">${weekday(a.date)}</td>
+      <td class="mono">${fmtDate(a.date)}</td>
+      <td>${typePill(a.type)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${a.name}</td>
+      <td class="mono">${fmtDuration(a.duration)}</td>
+      <td class="mono">${a.distKm>0?a.distKm.toFixed(1)+' km':'—'}</td>
+      <td class="mono">${a.hr?Math.round(a.hr)+' bpm':'—'}</td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click',()=>openDeepDive(tr.dataset.id));
+  });
+}
+function periodStats(acts,containerId){
+  const totalMins=acts.reduce((s,a)=>s+a.duration,0);
+  const totalKm=acts.reduce((s,a)=>s+a.distKm,0);
+  const hrs=acts.filter(a=>a.hr>0);
+  const avgHr=hrs.length?Math.round(hrs.reduce((s,a)=>s+a.hr,0)/hrs.length):0;
+  document.getElementById(containerId).innerHTML=`
+    <div class="metric-card"><div class="metric-label">Sessions</div><div class="metric-value">${acts.length}</div></div>
+    <div class="metric-card"><div class="metric-label">Total Time</div><div class="metric-value">${fmtDuration(totalMins)}</div></div>
+    <div class="metric-card"><div class="metric-label">Distance</div><div class="metric-value">${totalKm.toFixed(1)}<span class="metric-unit">km</span></div></div>
+    <div class="metric-card"><div class="metric-label">Avg HR</div><div class="metric-value">${avgHr||'—'}<span class="metric-unit">${avgHr?'bpm':''}</span></div></div>
+  `;
+}
+function typeChips(acts,containerId){
+  const types=['Run','Ride','HIIT','Swim'];
+  document.getElementById(containerId).innerHTML=types.map(t=>{
+    const arr=acts.filter(a=>a.type===t); if(!arr.length) return '';
+    return `<span class="type-chip tp tp-${t.toLowerCase()}">${t} · ${fmtDuration(arr.reduce((s,a)=>s+a.duration,0))}</span>`;
+  }).join('');
+}
+
+function renderWeek(weekKey){
+  const acts=activities.filter(a=>getWeekKey(a.date)===weekKey);
+  periodStats(acts,'week-stats'); typeChips(acts,'week-chips');
+  tableHeader('week-thead'); activityRows(acts,'week-tbody');
+}
+function renderMonth(monthKey){
+  const acts=activities.filter(a=>a.date.startsWith(monthKey));
+  periodStats(acts,'month-stats'); typeChips(acts,'month-chips');
+  tableHeader('month-thead'); activityRows(acts,'month-tbody');
+}
+
+function initWeekView(){
+  const keys=[...new Set(activities.map(a=>getWeekKey(a.date)))].sort().reverse();
+  const pills=document.getElementById('week-pills');
+  pills.innerHTML=keys.map(k=>{
+    const label=new Date(k+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return `<div class="period-pill" data-week="${k}">W ${label}</div>`;
+  }).join('');
+  const latest=keys[0];
+  pills.querySelectorAll('.period-pill').forEach(p=>{
+    if(p.dataset.week===latest) p.classList.add('active');
+    p.addEventListener('click',()=>{
+      pills.querySelectorAll('.period-pill').forEach(x=>x.classList.remove('active'));
+      p.classList.add('active');
+      renderWeek(p.dataset.week);
+    });
+  });
+  if(latest) renderWeek(latest);
+}
+function initMonthView(){
+  const keys=[...new Set(activities.map(a=>getMonthKey(a.date)))].sort().reverse();
+  const pills=document.getElementById('month-pills');
+  pills.innerHTML=keys.map(k=>{
+    const [y,m]=k.split('-');
+    const label=new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    return `<div class="period-pill" data-month="${k}">${label}</div>`;
+  }).join('');
+  const latest=keys[0];
+  pills.querySelectorAll('.period-pill').forEach(p=>{
+    if(p.dataset.month===latest) p.classList.add('active');
+    p.addEventListener('click',()=>{
+      pills.querySelectorAll('.period-pill').forEach(x=>x.classList.remove('active'));
+      p.classList.add('active');
+      renderMonth(p.dataset.month);
+    });
+  });
+  if(latest) renderMonth(latest);
+}
+
+// ── All activities ────────────────────────────────────────────────────────────
+let allFilter='All';
+function renderAllActivities(){
+  const filtered=allFilter==='All'?activities:activities.filter(a=>a.type===allFilter);
+  periodStats(filtered,'all-stats');
+  typeChips(filtered,'all-chips');
+  document.getElementById('all-thead').innerHTML='<tr><th>Day</th><th>Date</th><th>Type</th><th>Name</th><th>Duration</th><th>Distance</th><th>HR</th></tr>';
+  const tbody=document.getElementById('all-tbody');
+  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date));
+  tbody.innerHTML=sorted.map(a=>`
+    <tr data-id="${a.id}">
+      <td class="mono">${weekday(a.date)}</td>
+      <td class="mono">${fmtDate(a.date)}</td>
+      <td>${typePill(a.type)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${a.name}</td>
+      <td class="mono">${fmtDuration(a.duration)}</td>
+      <td class="mono">${a.distKm>0?a.distKm.toFixed(1)+' km':'—'}</td>
+      <td class="mono">${a.hr?Math.round(a.hr)+' bpm':'—'}</td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click',()=>openDeepDive(tr.dataset.id));
+  });
+}
+
+// ── Races view ────────────────────────────────────────────────────────────────
+function renderRaces(){
+  const carousel=document.getElementById('race-carousel');
+  carousel.innerHTML=getRacesDisplayOrder().map(raceCardHtml).join('');
+  wireCarouselEvents(carousel);
+  buildHyroxCharts('chart-races-time','chart-stations','chart-runs');
+}
+
+// ── User races storage ────────────────────────────────────────────────────────
+function loadUserRaces(){ const r=store.get('user_races'); return r?JSON.parse(r):[]; }
+function saveUserRaces(races){ store.set('user_races',JSON.stringify(races)); }
+
+// ── Add race modal ────────────────────────────────────────────────────────────
+let currentRaceType='hyrox';
+
+function openAddRaceModal(){
+  document.getElementById('add-race-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeAddRaceModal(){
+  document.getElementById('add-race-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+document.getElementById('open-add-race-btn').addEventListener('click',openAddRaceModal);
+document.getElementById('add-race-close').addEventListener('click',closeAddRaceModal);
+document.getElementById('add-race-overlay').addEventListener('click',e=>{ if(e.target.id==='add-race-overlay') closeAddRaceModal(); });
+
+document.querySelectorAll('.race-type-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.race-type-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRaceType=btn.dataset.rtype;
+    document.getElementById('hyrox-race-fields').style.display=currentRaceType==='hyrox'?'block':'none';
+    document.getElementById('other-race-fields').style.display=currentRaceType==='other'?'block':'none';
+  });
+});
+
+document.getElementById('save-hyrox-race').addEventListener('click',()=>{
+  const url=document.getElementById('hr-url').value.trim();
+  const date=document.getElementById('hr-date').value;
+  const notes=document.getElementById('hr-notes').value.trim();
+  if(!date){ alert('Please select a date.'); return; }
+  const races=loadUserRaces();
+  const name='Hyrox '+new Date(date+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+  races.unshift({raceType:'hyrox',name,date,url,notes,addedAt:Date.now()});
+  saveUserRaces(races);
+  closeAddRaceModal();
+  if(currentView==='races'){ viewInited.races=false; renderRaces(); viewInited.races=true; }
+  // Reset fields
+  document.getElementById('hr-url').value='';
+  document.getElementById('hr-date').value='';
+  document.getElementById('hr-notes').value='';
+});
+
+document.getElementById('save-other-race').addEventListener('click',()=>{
+  const name=document.getElementById('or-name').value.trim();
+  const url=document.getElementById('or-url').value.trim();
+  const date=document.getElementById('or-date').value;
+  const time=document.getElementById('or-time').value.trim();
+  const notes=document.getElementById('or-notes').value.trim();
+  if(!name){ alert('Please enter a race name.'); return; }
+  const races=loadUserRaces();
+  races.unshift({raceType:'other',name,date,time,url,notes,addedAt:Date.now()});
+  saveUserRaces(races);
+  closeAddRaceModal();
+  if(currentView==='races'){ viewInited.races=false; renderRaces(); viewInited.races=true; }
+  document.getElementById('or-name').value='';
+  document.getElementById('or-url').value='';
+  document.getElementById('or-date').value='';
+  document.getElementById('or-time').value='';
+  document.getElementById('or-notes').value='';
+});
+
+// ── Deep dive ─────────────────────────────────────────────────────────────────
+let prevView='overview';
+function openDeepDive(id){
+  const a=activities.find(x=>x.id==id); if(!a) return;
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  document.getElementById('deep-dive').style.display='block';
+  document.getElementById('dd-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <div class="dd-title">${a.name}</div>
+      ${typePill(a.type)}
+      ${a.race?'<span class="tp" style="background:#fef3c7;color:#b45309">Race</span>':''}
+    </div>
+    <div class="dd-stats">
+      <div class="metric-card"><div class="metric-label">Duration</div><div class="metric-value">${fmtDuration(a.duration)}</div></div>
+      ${a.distKm>0?`<div class="metric-card"><div class="metric-label">Distance</div><div class="metric-value">${a.distKm.toFixed(2)}<span class="metric-unit">km</span></div></div>`:''}
+      ${a.pace?`<div class="metric-card"><div class="metric-label">Pace</div><div class="metric-value" style="font-size:16px">${a.pace}</div></div>`:''}
+      ${a.hr?`<div class="metric-card"><div class="metric-label">Avg HR</div><div class="metric-value">${Math.round(a.hr)}<span class="metric-unit">bpm</span></div></div>`:''}
+      ${a.elev?`<div class="metric-card"><div class="metric-label">Elevation</div><div class="metric-value">${a.elev.toFixed(0)}<span class="metric-unit">m</span></div></div>`:''}
+      ${a.cal?`<div class="metric-card"><div class="metric-label">Calories</div><div class="metric-value">${a.cal}<span class="metric-unit">kcal</span></div></div>`:''}
+    </div>
+    ${a.desc?`<div class="dd-desc">"${a.desc}"</div>`:''}
+    <a class="strava-link" href="https://www.strava.com/activities/${a.id}" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+      View on Strava
+    </a>
+  `;
+}
+document.getElementById('dd-back').addEventListener('click',()=>{
+  document.getElementById('deep-dive').style.display='none';
+  document.getElementById('view-'+prevView).style.display='block';
+});
+
+// ── Gallery ───────────────────────────────────────────────────────────────────
+let currentGalleryRace=null;
+
+function openGallery(raceName){
+  currentGalleryRace=raceName;
+  document.getElementById('gallery-title').textContent=raceName+' — Photos';
+  document.getElementById('gallery-file-input').value='';
+  document.getElementById('upload-queue').innerHTML='';
+  renderGalleryGrid();
+  document.getElementById('gallery-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeGallery(){
+  document.getElementById('gallery-overlay').classList.remove('open');
+  document.body.style.overflow='';
+  currentGalleryRace=null;
+  // Refresh photo strips in carousels
+  if(currentView==='races') renderRaces();
+}
+function renderGalleryGrid(){
+  const photos=loadPhotos(currentGalleryRace);
+  const grid=document.getElementById('gallery-grid');
+  if(!photos.length){
+    grid.innerHTML='<div class="gallery-empty"><div class="gallery-empty-icon">📷</div>No photos yet — add your first one below</div>';
+    return;
+  }
+  grid.innerHTML=photos.map((p,i)=>{
+    const thumb=`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/w_400,h_400,c_fill/${p.public_id}`;
+    return `<div class="gallery-thumb" data-url="${p.secure_url}">
+      <img src="${thumb}" loading="lazy" alt="Race photo">
+      <button class="gallery-thumb-del" data-index="${i}" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.gallery-thumb').forEach((el,i)=>{
+    el.addEventListener('click',e=>{ if(e.target.closest('.gallery-thumb-del')) return; openLightbox(loadPhotos(currentGalleryRace),i); });
+  });
+  grid.querySelectorAll('.gallery-thumb-del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const photos=loadPhotos(currentGalleryRace);
+      photos.splice(+btn.dataset.index,1);
+      savePhotos(currentGalleryRace,photos);
+      renderGalleryGrid();
+    });
+  });
+}
+
+document.getElementById('gallery-close-btn').addEventListener('click',closeGallery);
+document.getElementById('gallery-overlay').addEventListener('click',e=>{ if(e.target.id==='gallery-overlay') closeGallery(); });
+const galleryFileInput=document.getElementById('gallery-file-input');
+galleryFileInput.addEventListener('change',()=>handleFiles(galleryFileInput.files));
+const dropArea=document.getElementById('gallery-drop-area');
+dropArea.addEventListener('dragover',e=>{ e.preventDefault(); dropArea.classList.add('drag'); });
+dropArea.addEventListener('dragleave',()=>dropArea.classList.remove('drag'));
+dropArea.addEventListener('drop',e=>{ e.preventDefault(); dropArea.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+async function uploadPhoto(file){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    const fd=new FormData();
+    fd.append('file',file);
+    fd.append('upload_preset',CLOUDINARY_PRESET);
+    const queue=document.getElementById('upload-queue');
+    const item=document.createElement('div');
+    item.className='upload-item';
+    item.innerHTML=`<span class="upload-item-name">${file.name}</span><div class="upload-bar"><div class="upload-bar-fill" style="width:0%"></div></div>`;
+    queue.appendChild(item);
+    const fill=item.querySelector('.upload-bar-fill');
+    xhr.upload.onprogress=e=>{ if(e.lengthComputable) fill.style.width=(e.loaded/e.total*100)+'%'; };
+    xhr.onload=()=>{
+      if(xhr.status===200){ fill.style.width='100%'; setTimeout(()=>item.remove(),700); resolve(JSON.parse(xhr.responseText)); }
+      else { item.remove(); reject(new Error('Upload failed '+xhr.status)); }
+    };
+    xhr.onerror=()=>{ item.remove(); reject(new Error('Network error')); };
+    xhr.open('POST',`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`);
+    xhr.send(fd);
+  });
+}
+async function handleFiles(files){
+  if(!files.length||!currentGalleryRace) return;
+  for(const file of Array.from(files)){
+    try {
+      const res=await uploadPhoto(file);
+      const photos=loadPhotos(currentGalleryRace);
+      photos.push({public_id:res.public_id,secure_url:res.secure_url});
+      savePhotos(currentGalleryRace,photos);
+      renderGalleryGrid();
+    } catch(e){ console.error('Upload error:',e); }
+  }
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+let lbPhotos=[], lbIndex=0;
+function openLightbox(photos,index){
+  lbPhotos=photos; lbIndex=index; showLightboxPhoto();
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src='';
+}
+function showLightboxPhoto(){
+  document.getElementById('lightbox-img').src=lbPhotos[lbIndex].secure_url;
+  const nav=lbPhotos.length>1;
+  document.getElementById('lightbox-prev').style.display=nav?'flex':'none';
+  document.getElementById('lightbox-next').style.display=nav?'flex':'none';
+  document.getElementById('lightbox-counter').textContent=nav?`${lbIndex+1} / ${lbPhotos.length}`:'';
+}
+function navigateLightbox(dir){
+  lbIndex=(lbIndex+dir+lbPhotos.length)%lbPhotos.length;
+  showLightboxPhoto();
+}
+document.getElementById('lightbox-close').addEventListener('click',closeLightbox);
+document.getElementById('lightbox-prev').addEventListener('click',()=>navigateLightbox(-1));
+document.getElementById('lightbox-next').addEventListener('click',()=>navigateLightbox(1));
+document.getElementById('lightbox').addEventListener('click',e=>{ if(e.target.id==='lightbox') closeLightbox(); });
+let _tx=0,_ty=0;
+document.getElementById('lightbox').addEventListener('touchstart',e=>{ _tx=e.touches[0].clientX; _ty=e.touches[0].clientY; },{passive:true});
+document.getElementById('lightbox').addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-_tx, dy=e.changedTouches[0].clientY-_ty;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40) navigateLightbox(dx<0?1:-1);
+},{passive:true});
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('lightbox').classList.contains('open')){
+    if(e.key==='ArrowLeft') navigateLightbox(-1);
+    if(e.key==='ArrowRight') navigateLightbox(1);
+    if(e.key==='Escape') closeLightbox();
+  } else if(e.key==='Escape'){
+    closeGallery();
+    closeAddRaceModal();
+    document.getElementById('hyrox-overview-overlay').classList.remove('open');
+    document.body.style.overflow='';
+  }
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+let currentView='overview';
+let viewInited={};
+
+function showView(name){
+  document.getElementById('deep-dive').style.display='none';
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  const el=document.getElementById('view-'+name);
+  if(el) el.style.display='block';
+  currentView=name; prevView=name;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===name));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  if(name==='overview'&&!viewInited.overview){ renderOverview(); viewInited.overview=true; }
+  if(name==='week'&&!viewInited.week){ initWeekView(); viewInited.week=true; }
+  if(name==='month'&&!viewInited.month){ initMonthView(); viewInited.month=true; }
+  if(name==='all'&&!viewInited.all){ renderAllActivities(); viewInited.all=true; }
+  if(name==='races'&&!viewInited.races){ renderRaces(); viewInited.races=true; }
+}
+
+document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>showView(n.dataset.view)));
+document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+
+document.querySelectorAll('.toggle-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const chart=btn.dataset.chart, period=btn.dataset.period;
+    btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(chart==='sessions'){ sessionsChartPeriod=period; renderSessionsChart(); }
+    if(chart==='volume'){ volumeChartPeriod=period; renderVolumeChart(); }
+  });
+});
+
+document.querySelectorAll('#all-filters .filter-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#all-filters .filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    allFilter=btn.dataset.type;
+    renderAllActivities();
+  });
+});
+
+// ── Error handling ────────────────────────────────────────────────────────────
+function showError(msg){
+  document.getElementById('error-container').innerHTML=`
+    <div class="error-card"><p>${msg}</p><button class="retry-btn" onclick="init()">Retry</button></div>`;
+}
+function clearError(){ document.getElementById('error-container').innerHTML=''; }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init(){
+  clearError();
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code'), errorParam=params.get('error');
+  if(errorParam){
+    document.getElementById('connect-screen').style.display='flex';
+    document.getElementById('connect-error').style.display='block';
+    document.getElementById('connect-error').textContent='Authorization denied: '+errorParam;
+    return;
+  }
+  if(code){
+    window.history.replaceState({},document.title,window.location.pathname);
+    loadStart();
+    try{ await exchangeCode(code); }
+    catch(e){
+      loadDone();
+      document.getElementById('connect-screen').style.display='flex';
+      document.getElementById('connect-error').style.display='block';
+      document.getElementById('connect-error').textContent=e.message;
+      return;
+    }
+  }
+  const token=await ensureValidToken();
+  if(!token){ document.getElementById('connect-screen').style.display='flex'; return; }
+  document.getElementById('connect-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  loadStart();
+  try{
+    activities=await fetchAllActivities(token);
+    loadDone();
+    showView('overview');
+  } catch(e){
+    loadDone();
+    document.getElementById('app').style.display='flex';
+    showView('overview');
+    showError('Failed to load activities: '+e.message);
+  }
+}
+
+document.getElementById('connect-btn').addEventListener('click',()=>{
+  const url=`https://www.strava.com/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=activity:read_all`;
+  window.location.href=url;
+});
+
+init();
+</script>
+</body>
+</html>
