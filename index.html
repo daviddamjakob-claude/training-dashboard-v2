@@ -129,8 +129,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 /* Race carousel */
 .race-carousel{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:24px}
 .race-carousel::-webkit-scrollbar{display:none}
-.hyrox-card{width:280px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;transition:box-shadow 0.15s,transform 0.15s}
-.hyrox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.hyrox-card{width:280px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow 0.15s;position:relative}
 .hyrox-card.pb{border-color:#bbf7d0;background:linear-gradient(135deg,#f0fdf4,#ffffff)}
 .hyrox-card.target-card{border-color:#ddd6fe;background:linear-gradient(135deg,#f5f3ff,#ffffff)}
 .hyrox-card.user-card{border-color:#bfdbfe;background:linear-gradient(135deg,#eff6ff,#ffffff)}
@@ -165,6 +164,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 .photo-add-btn:hover{background:var(--surface3)}
 .photo-camera-btn{margin-left:auto;font-size:16px;color:var(--muted);cursor:pointer;padding:4px;border-radius:4px;transition:color 0.15s}
 .photo-camera-btn:hover{color:var(--text)}
+.card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.card-action-btn{width:28px;height:28px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;transition:background 0.15s;line-height:1}
+.card-action-btn:hover{background:var(--surface3)}
+.card-action-btn.del:hover{background:#fee2e2;border-color:#fca5a5}
 
 /* Add race result modal */
 #add-race-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
@@ -428,18 +431,6 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <button class="btn-add-race" id="open-add-race-btn">+ Add Race Result</button>
       </div>
       <div id="race-carousel" class="race-carousel"></div>
-      <div class="chart-card">
-        <div class="chart-header"><div class="chart-title">Finish time progression</div></div>
-        <div class="chart-wrap"><canvas id="chart-races-time" height="200"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-header"><div class="chart-title">Station comparison</div></div>
-        <div class="chart-wrap"><canvas id="chart-stations" height="200"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-header"><div class="chart-title">Run comparison</div></div>
-        <div class="chart-wrap"><canvas id="chart-runs" height="200"></canvas></div>
-      </div>
     </div>
 
     <!-- Deep Dive -->
@@ -481,13 +472,13 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
   <div id="add-race-modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title">Add Race Result</div>
+      <div class="modal-title" id="add-race-title">Add Race Result</div>
       <button class="modal-close" id="add-race-close">✕</button>
     </div>
     <div class="modal-body">
       <div class="race-type-toggle">
         <div class="race-type-btn active" data-rtype="hyrox">Hyrox Race</div>
-        <div class="race-type-btn" data-rtype="other">Other Race</div>
+        <div class="race-type-btn" data-rtype="other" style="opacity:0.4;pointer-events:none">Other Race</div>
       </div>
       <div id="hyrox-race-fields">
         <div class="form-field">
@@ -502,8 +493,8 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
           <label class="form-label">Notes (optional)</label>
           <textarea class="form-textarea" id="hr-notes" placeholder="Any notes about the race..."></textarea>
         </div>
-        <button class="btn-orange" id="save-hyrox-race">Save Race</button>
-        <div class="form-note">Splits and rankings will be populated when you share the link with Claude.</div>
+        <button class="btn-orange" id="save-hyrox-race">Fetch &amp; Save</button>
+        <div class="form-note">Paste your results.hyrox.com detail URL — splits and rankings will be fetched automatically.</div>
       </div>
       <div id="other-race-fields" style="display:none">
         <div class="form-field">
@@ -578,6 +569,7 @@ const REDIRECT_URI = 'https://daviddamjakob-claude.github.io/training-dashboard-
 const CLOUDINARY_CLOUD = 'dglx8phdf';
 const CLOUDINARY_PRESET = 'claude_strava_dashboard';
 const CACHE_TTL_MS = 30 * 60 * 1000;
+const PROXY_URL = 'https://hyrox-proxy.david-damjakob.workers.dev';
 const START_DATE = new Date('2026-01-01T00:00:00Z');
 
 // ── Storage ──────────────────────────────────────────────────────────────────
@@ -768,7 +760,7 @@ function weekLabel(k){ return new Date(k+'T12:00:00').toLocaleDateString('en-GB'
 // ── Hyrox data ────────────────────────────────────────────────────────────────
 const HYROX_RACES = [
   {
-    name:'Poznan', date:'Dec 2025', time:'1:11:39', timeSecs:71*60+39,
+    id:'poznan', name:'Poznan', date:'Dec 2025', time:'1:11:39', timeSecs:71*60+39,
     rank:'#160/1184', ag:'#42', pb:false, target:false,
     runTotal:'35:45', runRank:'#172', roxzone:'6:32', rxRank:'#731',
     stations:[
@@ -781,7 +773,7 @@ const HYROX_RACES = [
     progress:62
   },
   {
-    name:'Lisbon', date:'2 May 2026', time:'1:05:09', timeSecs:65*60+9,
+    id:'lisbon', name:'Lisbon', date:'2 May 2026', time:'1:05:09', timeSecs:65*60+9,
     rank:'#30 M/W', ag:'#10', pb:true, target:false,
     runTotal:'31:42', runRank:'#23', roxzone:'5:01', rxRank:'#222',
     stations:[
@@ -794,7 +786,7 @@ const HYROX_RACES = [
     progress:78
   },
   {
-    name:'Barcelona', date:'15 May 2026', time:'1:03:35', timeSecs:63*60+35,
+    id:'barcelona', name:'Barcelona', date:'15 May 2026', time:'1:03:35', timeSecs:63*60+35,
     rank:'#14 M/W', ag:'#5', pb:true, target:false,
     runTotal:'31:58', runRank:'#22', roxzone:'5:09', rxRank:'#110',
     stations:[
@@ -807,7 +799,7 @@ const HYROX_RACES = [
     progress:84
   },
   {
-    name:'Berlin', date:'30 May 2026', time:'sub 1:00', timeSecs:60*60,
+    id:'berlin', name:'Berlin', date:'30 May 2026', time:'sub 1:00', timeSecs:60*60,
     rank:'Target race', ag:'', pb:false, target:true,
     gap:'-03:35',
     levers:['Roxzone sub 3:30','Run pace sub 3:55/km','Wall Balls sub 4:30','Farmers Carry sub 1:35'],
@@ -815,16 +807,27 @@ const HYROX_RACES = [
   }
 ];
 
-// Display order: Berlin (target/next), Barcelona (most recent PB), Lisbon, Poznan
-function getRacesDisplayOrder(){
-  const userRaces = loadUserRaces();
-  const ordered = [
-    HYROX_RACES.find(r=>r.name==='Berlin'),
-    HYROX_RACES.find(r=>r.name==='Barcelona'),
-    HYROX_RACES.find(r=>r.name==='Lisbon'),
-    HYROX_RACES.find(r=>r.name==='Poznan')
+// ── All-races localStorage (seed data + user-added) ──────────────────────────
+function loadAllRaces(){ const r=store.get('all_races'); return r?JSON.parse(r):[]; }
+function saveAllRaces(races){ store.set('all_races',JSON.stringify(races)); }
+function initAllRaces(){
+  if(store.get('all_races')) return; // already seeded
+  const seed=[
+    {...HYROX_RACES.find(r=>r.id==='berlin')},
+    {...HYROX_RACES.find(r=>r.id==='barcelona')},
+    {...HYROX_RACES.find(r=>r.id==='lisbon')},
+    {...HYROX_RACES.find(r=>r.id==='poznan')}
   ];
-  return [...userRaces.map(r=>({...r,isUser:true})), ...ordered];
+  saveAllRaces(seed);
+}
+function deleteRaceById(id){ saveAllRaces(loadAllRaces().filter(r=>r.id!==id)); }
+function updateRaceById(id,updates){
+  saveAllRaces(loadAllRaces().map(r=>r.id===id?{...r,...updates}:r));
+}
+
+// Display order: whatever order we saved (Berlin first in seed)
+function getRacesDisplayOrder(){
+  return loadAllRaces();
 }
 
 function parseTime(t){ if(!t) return 0; const parts=(t||'0:0').split(':').map(Number); return parts.length===2?parts[0]*60+parts[1]:0; }
@@ -849,24 +852,19 @@ function photoStripHtml(raceName){
 }
 
 // ── Race card HTML ────────────────────────────────────────────────────────────
+function cardActionsHtml(r){
+  if(!r.id) return '';
+  return `<div class="card-actions">
+    <button class="card-action-btn edit" data-id="${r.id}" title="Edit">✏️</button>
+    <button class="card-action-btn del" data-id="${r.id}" title="Delete">🗑️</button>
+  </div>`;
+}
+
 function raceCardHtml(r){
-  if(r.isUser){
-    const isHyrox=r.raceType==='hyrox';
-    return `<div class="hyrox-card user-card" data-race="${r.name}">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-        <div class="hyrox-race-name">${r.name}</div>
-        <span class="user-badge">User</span>
-      </div>
-      <div class="hyrox-date">${r.date||''}</div>
-      ${r.time?`<div class="hyrox-time" style="font-size:20px">${r.time}</div>`:''}
-      ${r.notes?`<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">${r.notes}</div>`:''}
-      ${r.url?`<a href="${r.url}" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:#FC4C02">View results ↗</a>`:''}
-      ${isHyrox?`<div class="form-note" style="margin-top:8px">Share the link with Claude to populate splits.</div>`:''}
-      ${photoStripHtml(r.name)}
-    </div>`;
-  }
+  const actions=cardActionsHtml(r);
   if(r.target){
-    return `<div class="hyrox-card target-card" data-race="${r.name}">
+    return `<div class="hyrox-card target-card" data-race="${r.name}" data-id="${r.id||''}">
+      <div style="display:flex;align-items:center;margin-bottom:2px">${actions}</div>
       <div class="hyrox-race-name">${r.name}</div>
       <div class="hyrox-date">${r.date}</div>
       <div class="hyrox-time target-time">${r.time}</div>
@@ -878,21 +876,40 @@ function raceCardHtml(r){
       ${photoStripHtml(r.name)}
     </div>`;
   }
-  return `<div class="hyrox-card ${r.pb?'pb':''}" data-race="${r.name}">
-    <div class="hyrox-race-name">${r.name}</div>
-    <div class="hyrox-date">${r.date}</div>
-    <div class="hyrox-time ${r.pb?'pb-time':''}">${r.time}</div>
-    <div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>
-    <div class="hyrox-prog"><div class="hyrox-prog-fill green" style="width:${r.progress}%"></div></div>
-    <div class="hyrox-section">Run & Roxzone</div>
-    <div class="station-badges">
-      <div class="station-badge"><div class="station-badge-name">Run Total</div><span class="station-badge-time">${r.runTotal}</span><span class="station-badge-rank">${r.runRank}</span></div>
-      <div class="station-badge"><div class="station-badge-name">Roxzone</div><span class="station-badge-time">${r.roxzone}</span><span class="station-badge-rank">${r.rxRank}</span></div>
+  if(r.stations && r.stations.length){
+    // Full race with splits
+    return `<div class="hyrox-card ${r.pb?'pb':''}" data-race="${r.name}" data-id="${r.id||''}">
+      <div style="display:flex;align-items:center;margin-bottom:2px">
+        <div class="hyrox-race-name" style="flex:1">${r.name}</div>
+        ${actions}
+      </div>
+      <div class="hyrox-date">${r.date}</div>
+      <div class="hyrox-time ${r.pb?'pb-time':''}">${r.time}</div>
+      <div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>
+      <div class="hyrox-prog"><div class="hyrox-prog-fill green" style="width:${r.progress||0}%"></div></div>
+      <div class="hyrox-section">Run & Roxzone</div>
+      <div class="station-badges">
+        <div class="station-badge"><div class="station-badge-name">Run Total</div><span class="station-badge-time">${r.runTotal||'—'}</span><span class="station-badge-rank">${r.runRank||''}</span></div>
+        <div class="station-badge"><div class="station-badge-name">Roxzone</div><span class="station-badge-time">${r.roxzone||'—'}</span><span class="station-badge-rank">${r.rxRank||''}</span></div>
+      </div>
+      <div class="hyrox-section">Stations</div>
+      <div class="station-badges">${r.stations.map(s=>`<div class="station-badge"><div class="station-badge-name">${s.name}</div><span class="station-badge-time">${s.time}</span><span class="station-badge-rank">${s.rank}</span></div>`).join('')}</div>
+      <div class="hyrox-section">Runs</div>
+      <div class="runs-grid">${(r.runs||[]).map(t=>`<span class="run-badge">${t}</span>`).join('')}</div>
+      ${photoStripHtml(r.name)}
+    </div>`;
+  }
+  // Minimal card (no splits yet, or other race type)
+  return `<div class="hyrox-card" data-race="${r.name}" data-id="${r.id||''}">
+    <div style="display:flex;align-items:center;margin-bottom:2px">
+      <div class="hyrox-race-name" style="flex:1">${r.name}</div>
+      ${actions}
     </div>
-    <div class="hyrox-section">Stations</div>
-    <div class="station-badges">${r.stations.map(s=>`<div class="station-badge"><div class="station-badge-name">${s.name}</div><span class="station-badge-time">${s.time}</span><span class="station-badge-rank">${s.rank}</span></div>`).join('')}</div>
-    <div class="hyrox-section">Runs</div>
-    <div class="runs-grid">${r.runs.map(t=>`<span class="run-badge">${t}</span>`).join('')}</div>
+    <div class="hyrox-date">${r.date||''}</div>
+    ${r.time?`<div class="hyrox-time" style="font-size:20px">${r.time}</div>`:''}
+    ${r.rank?`<div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>`:''}
+    ${r.notes?`<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">${r.notes}</div>`:''}
+    ${r.url?`<a href="${r.url}" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:#FC4C02">View results ↗</a>`:''}
     ${photoStripHtml(r.name)}
   </div>`;
 }
@@ -909,6 +926,22 @@ function wireCarouselEvents(containerEl){
     btn.addEventListener('click',e=>{
       e.stopPropagation();
       openGallery(btn.dataset.race);
+    });
+  });
+  containerEl.querySelectorAll('.card-action-btn.edit').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      openEditModal(btn.dataset.id);
+    });
+  });
+  containerEl.querySelectorAll('.card-action-btn.del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const race=loadAllRaces().find(r=>r.id===btn.dataset.id);
+      if(!race) return;
+      if(!confirm(`Delete "${race.name}"? This cannot be undone.`)) return;
+      deleteRaceById(btn.dataset.id);
+      viewInited.races=false; renderRaces(); viewInited.races=true;
     });
   });
 }
@@ -1024,13 +1057,7 @@ function openHyroxOverviewModal(){
   document.body.style.overflow='hidden';
   // Populate carousel
   const carousel=document.getElementById('ov-carousel');
-  const displayRaces=[
-    HYROX_RACES.find(r=>r.name==='Berlin'),
-    HYROX_RACES.find(r=>r.name==='Barcelona'),
-    HYROX_RACES.find(r=>r.name==='Lisbon'),
-    HYROX_RACES.find(r=>r.name==='Poznan')
-  ];
-  carousel.innerHTML=displayRaces.map(raceCardHtml).join('');
+  carousel.innerHTML=loadAllRaces().map(raceCardHtml).join('');
   wireCarouselEvents(carousel);
   // Build charts (destroy first to recreate)
   setTimeout(()=>{
@@ -1248,23 +1275,106 @@ function renderRaces(){
   const carousel=document.getElementById('race-carousel');
   carousel.innerHTML=getRacesDisplayOrder().map(raceCardHtml).join('');
   wireCarouselEvents(carousel);
-  buildHyroxCharts('chart-races-time','chart-stations','chart-runs');
 }
 
-// ── User races storage ────────────────────────────────────────────────────────
-function loadUserRaces(){ const r=store.get('user_races'); return r?JSON.parse(r):[]; }
-function saveUserRaces(races){ store.set('user_races',JSON.stringify(races)); }
+// ── Fetch Hyrox results via CF Worker proxy ───────────────────────────────────
+async function fetchHyroxResults(url){
+  const proxyResp=await fetch(`${PROXY_URL}?url=${encodeURIComponent(url)}`);
+  if(!proxyResp.ok) throw new Error(`Proxy error ${proxyResp.status}`);
+  const html=await proxyResp.text();
+  const doc=new DOMParser().parseFromString(html,'text/html');
 
-// ── Add race modal ────────────────────────────────────────────────────────────
+  function td(cls){ const el=doc.querySelector(`td[class*="${cls}"]`); return el?el.textContent.trim():null; }
+  function fmtTime(hms){
+    if(!hms) return null;
+    const parts=hms.split(':');
+    if(parts.length===3){ const h=parseInt(parts[0]); return h>0?`${h}:${parts[1]}:${parts[2]}`:`${parseInt(parts[1])}:${parts[2]}`; }
+    return hms;
+  }
+  function toSecs(hms){
+    if(!hms) return 0;
+    const p=hms.split(':').map(Number);
+    return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+(p[1]||0);
+  }
+
+  const meeting=td('f-__meeting')||'';
+  const finish=td('f-time_finish_netto')||'0:00:00';
+  const rankAll=td('f-place_all')||'?';
+  const rankAg=td('f-place_age')||'?';
+
+  // Runs: f-time_01 to f-time_08
+  const runs=[];
+  for(let i=1;i<=8;i++){
+    const t=td(`f-time_0${i}`); if(t) runs.push(fmtTime(t));
+  }
+
+  // Stations: f-time_11 to f-time_18 with ranks
+  const stationLabels=['SkiErg','Sled Push','Sled Pull','Burpee BJ','Row','Farmers Carry','Sandbag Lunges','Wall Balls'];
+  const stations=[];
+  for(let i=11;i<=18;i++){
+    const row=doc.querySelector(`tr[class*="f-time_${i}"]`);
+    if(!row) continue;
+    const tds=row.querySelectorAll('td');
+    const time=tds[0]?fmtTime(tds[0].textContent.trim()):null;
+    const rankRaw=tds[1]?tds[1].textContent.trim().replace(/[^0-9]/g,''):'';
+    stations.push({name:stationLabels[i-11],time:time||'—',rank:rankRaw?`#${rankRaw}`:'—'});
+  }
+
+  const runTotal=fmtTime(td('f-time_49'));
+  const runRankRaw=(()=>{ const r=doc.querySelector('tr[class*="f-time_49"] td:last-child'); return r?r.textContent.trim().replace(/[^0-9]/g,''):''; })();
+  const roxzone=fmtTime(td('f-time_60'));
+  const rxRankRaw=(()=>{ const r=doc.querySelector('tr[class*="f-time_60"] td:last-child'); return r?r.textContent.trim().replace(/[^0-9]/g,''):''; })();
+
+  const raceName=meeting.replace(/^\d{4}\s*/,'').trim();
+
+  return {
+    name:raceName||'Hyrox Race',
+    time:fmtTime(finish)||finish,
+    timeSecs:toSecs(finish),
+    rank:`#${rankAll} M/W`,
+    ag:`#${rankAg}`,
+    pb:false,target:false,
+    runTotal:runTotal||'—',
+    runRank:runRankRaw?`#${runRankRaw}`:'—',
+    roxzone:roxzone||'—',
+    rxRank:rxRankRaw?`#${rxRankRaw}`:'—',
+    stations,
+    runs,
+    progress:0,
+    url
+  };
+}
+
+// ── Add/Edit race modal ───────────────────────────────────────────────────────
 let currentRaceType='hyrox';
+let editingRaceId=null;
 
 function openAddRaceModal(){
+  editingRaceId=null;
+  document.getElementById('add-race-title').textContent='Add Race Result';
+  document.getElementById('save-hyrox-race').textContent='Fetch & Save';
+  document.getElementById('add-race-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function openEditModal(id){
+  const race=loadAllRaces().find(r=>r.id===id);
+  if(!race) return;
+  editingRaceId=id;
+  document.getElementById('add-race-title').textContent='Edit Race';
+  document.getElementById('save-hyrox-race').textContent='Fetch & Update';
+  document.getElementById('hr-url').value=race.url||'';
+  // Parse date back to YYYY-MM-DD if possible
+  document.getElementById('hr-date').value='';
+  document.getElementById('hr-notes').value=race.notes||'';
   document.getElementById('add-race-overlay').classList.add('open');
   document.body.style.overflow='hidden';
 }
 function closeAddRaceModal(){
   document.getElementById('add-race-overlay').classList.remove('open');
   document.body.style.overflow='';
+  editingRaceId=null;
+  document.getElementById('add-race-title').textContent='Add Race Result';
+  document.getElementById('save-hyrox-race').textContent='Fetch & Save';
 }
 
 document.getElementById('open-add-race-btn').addEventListener('click',openAddRaceModal);
@@ -1281,21 +1391,39 @@ document.querySelectorAll('.race-type-btn').forEach(btn=>{
   });
 });
 
-document.getElementById('save-hyrox-race').addEventListener('click',()=>{
+document.getElementById('save-hyrox-race').addEventListener('click',async()=>{
   const url=document.getElementById('hr-url').value.trim();
-  const date=document.getElementById('hr-date').value;
+  const dateVal=document.getElementById('hr-date').value;
   const notes=document.getElementById('hr-notes').value.trim();
-  if(!date){ alert('Please select a date.'); return; }
-  const races=loadUserRaces();
-  const name='Hyrox '+new Date(date+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-  races.unshift({raceType:'hyrox',name,date,url,notes,addedAt:Date.now()});
-  saveUserRaces(races);
-  closeAddRaceModal();
-  if(currentView==='races'){ viewInited.races=false; renderRaces(); viewInited.races=true; }
-  // Reset fields
-  document.getElementById('hr-url').value='';
-  document.getElementById('hr-date').value='';
-  document.getElementById('hr-notes').value='';
+  if(!url){ alert('Please enter a Hyrox results URL.'); return; }
+  const btn=document.getElementById('save-hyrox-race');
+  const origText=btn.textContent;
+  btn.textContent='Fetching…';
+  btn.disabled=true;
+  try{
+    const result=await fetchHyroxResults(url);
+    result.notes=notes;
+    if(dateVal) result.date=new Date(dateVal+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(editingRaceId){
+      result.id=editingRaceId;
+      updateRaceById(editingRaceId,result);
+    } else {
+      result.id='race_'+Date.now();
+      const races=loadAllRaces();
+      races.unshift(result);
+      saveAllRaces(races);
+    }
+    closeAddRaceModal();
+    if(currentView==='races'){ viewInited.races=false; renderRaces(); viewInited.races=true; }
+    document.getElementById('hr-url').value='';
+    document.getElementById('hr-date').value='';
+    document.getElementById('hr-notes').value='';
+  } catch(err){
+    alert('Failed to fetch results: '+err.message+'\nCheck the URL and try again.');
+  } finally{
+    btn.textContent=origText;
+    btn.disabled=false;
+  }
 });
 
 document.getElementById('save-other-race').addEventListener('click',()=>{
@@ -1305,9 +1433,9 @@ document.getElementById('save-other-race').addEventListener('click',()=>{
   const time=document.getElementById('or-time').value.trim();
   const notes=document.getElementById('or-notes').value.trim();
   if(!name){ alert('Please enter a race name.'); return; }
-  const races=loadUserRaces();
-  races.unshift({raceType:'other',name,date,time,url,notes,addedAt:Date.now()});
-  saveUserRaces(races);
+  const races=loadAllRaces();
+  races.unshift({id:'race_'+Date.now(),raceType:'other',name,date,time,url,notes,addedAt:Date.now()});
+  saveAllRaces(races);
   closeAddRaceModal();
   if(currentView==='races'){ viewInited.races=false; renderRaces(); viewInited.races=true; }
   document.getElementById('or-name').value='';
@@ -1534,6 +1662,7 @@ function clearError(){ document.getElementById('error-container').innerHTML=''; 
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init(){
+  initAllRaces();
   clearError();
   const params=new URLSearchParams(window.location.search);
   const code=params.get('code'), errorParam=params.get('error');
