@@ -139,10 +139,11 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 .hyrox-time.pb-time{color:#15803d}
 .hyrox-time.target-time{color:#7c3aed}
 .hyrox-rank{font-size:11px;color:var(--muted);margin-bottom:8px}
-.hyrox-prog{height:5px;background:var(--surface3);border-radius:3px;margin-bottom:12px;overflow:hidden}
+.hyrox-prog{height:5px;background:var(--surface3);border-radius:3px;margin-bottom:3px;overflow:hidden}
 .hyrox-prog-fill{height:100%;border-radius:3px;transition:width 0.6s ease}
 .hyrox-prog-fill.green{background:var(--run)}
 .hyrox-prog-fill.purple{background:var(--purple)}
+.hyrox-target-line{font-size:10px;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;letter-spacing:0.02em}
 .hyrox-section{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);margin-bottom:3px;margin-top:8px}
 .station-badges{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px}
 .station-badge{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 7px}
@@ -509,6 +510,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <div class="form-field">
           <label class="form-label">Title *</label>
           <input class="form-input" id="hr-title" type="text" placeholder="e.g. Barcelona">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Target Time (optional)</label>
+          <input class="form-input" id="hr-target" type="text" placeholder="e.g. 1:02:00">
         </div>
         <div class="form-field">
           <label class="form-label">Notes (optional)</label>
@@ -885,6 +890,21 @@ function photoStripHtml(raceName){
 }
 
 // ── Race card HTML ────────────────────────────────────────────────────────────
+function fmtSecsDisplay(secs){
+  const h=Math.floor(secs/3600),m=Math.floor((secs%3600)/60),s=secs%60;
+  return h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+}
+
+function cardProgHtml(r){
+  const hasTgt=r.targetSecs>0;
+  const prog=(hasTgt&&r.timeSecs>0)?Math.min(100,Math.round(r.targetSecs/r.timeSecs*100)):0;
+  const bar=`<div class="hyrox-prog"><div class="hyrox-prog-fill${hasTgt?' green':''}" style="width:${prog}%"></div></div>`;
+  const label=hasTgt
+    ?`<div class="hyrox-target-line">Target: ${fmtSecsDisplay(r.targetSecs)}</div>`
+    :`<div class="hyrox-target-line" style="color:var(--muted2)">No target</div>`;
+  return bar+label;
+}
+
 function cardActionsHtml(r){
   if(!r.id) return '';
   return `<div class="card-actions">
@@ -932,7 +952,7 @@ function raceCardHtml(r){
       <div class="hyrox-date">${r.date}</div>
       <div class="hyrox-time ${r.pb&&!r.color?'pb-time':''}">${r.time}</div>
       <div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>
-      <div class="hyrox-prog"><div class="hyrox-prog-fill green" style="width:${r.progress||0}%"></div></div>
+      ${cardProgHtml(r)}
       <div class="hyrox-section">Run & Roxzone</div>
       <div class="station-badges">
         <div class="station-badge"><div class="station-badge-name">Run Total</div><span class="station-badge-time">${r.runTotal||'—'}</span><span class="station-badge-rank">${r.runRank||''}</span></div>
@@ -955,6 +975,7 @@ function raceCardHtml(r){
     <div class="hyrox-date">${r.date||''}</div>
     ${r.time?`<div class="hyrox-time" style="font-size:20px">${r.time}</div>`:''}
     ${r.rank?`<div class="hyrox-rank">${r.rank}${r.ag?' · AG '+r.ag:''}</div>`:''}
+    ${r.timeSecs?cardProgHtml(r):''}
     ${r.url?`<a href="${r.url}" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:#FC4C02">View results ↗</a>`:''}
     ${note}
     ${photoStripHtml(r.name)}
@@ -1442,6 +1463,16 @@ function setSwatchColor(color){
   });
 }
 
+function parseTargetInput(val){
+  // Accepts "1:02:00", "1:02", "62" (minutes), etc. Returns seconds or 0.
+  if(!val) return 0;
+  const parts=val.trim().split(':').map(Number);
+  if(parts.some(isNaN)) return 0;
+  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2) return parts[0]*60+parts[1];
+  return parts[0];
+}
+
 function openAddRaceModal(){
   editingRaceId=null;
   document.getElementById('add-race-title').textContent='Add Race Result';
@@ -1449,6 +1480,7 @@ function openAddRaceModal(){
   document.getElementById('hr-url').value='';
   document.getElementById('hr-date').value='';
   document.getElementById('hr-title').value='';
+  document.getElementById('hr-target').value='';
   document.getElementById('hr-notes').value='';
   setSwatchColor('');
   document.getElementById('add-race-overlay').classList.add('open');
@@ -1463,6 +1495,7 @@ function openEditModal(id){
   document.getElementById('hr-url').value=race.url||'';
   document.getElementById('hr-date').value='';
   document.getElementById('hr-title').value=race.name||'';
+  document.getElementById('hr-target').value=race.targetSecs?fmtSecsDisplay(race.targetSecs):'';
   document.getElementById('hr-notes').value=race.notes||'';
   setSwatchColor(race.color||'');
   document.getElementById('add-race-overlay').classList.add('open');
@@ -1475,6 +1508,7 @@ function closeAddRaceModal(){
   document.getElementById('add-race-title').textContent='Add Race Result';
   document.getElementById('save-hyrox-race').textContent='Fetch & Save';
   document.getElementById('hr-title').value='';
+  document.getElementById('hr-target').value='';
   setSwatchColor('');
 }
 
@@ -1501,6 +1535,7 @@ document.getElementById('save-hyrox-race').addEventListener('click',async()=>{
   const url=document.getElementById('hr-url').value.trim();
   const dateVal=document.getElementById('hr-date').value;
   const customTitle=document.getElementById('hr-title').value.trim();
+  const targetInput=document.getElementById('hr-target').value.trim();
   const notes=document.getElementById('hr-notes').value.trim();
   if(!url){ alert('Please enter a Hyrox results URL.'); return; }
   if(!dateVal){ alert('Please select a date.'); return; }
@@ -1514,6 +1549,7 @@ document.getElementById('save-hyrox-race').addEventListener('click',async()=>{
     result.name=customTitle;
     result.notes=notes;
     result.color=selectedColor;
+    result.targetSecs=parseTargetInput(targetInput);
     if(dateVal) result.date=new Date(dateVal+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     if(editingRaceId){
       result.id=editingRaceId;
