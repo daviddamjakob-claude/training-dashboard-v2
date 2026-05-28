@@ -331,117 +331,39 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 <div id="app" style="display:none">
   <nav id="sidebar">
     <div class="sidebar-logo">Training <span>•</span></div>
-    <div class="nav-section">Views</div>
-    <div class="nav-item active" data-view="overview"><span class="dot"></span>Overview</div>
-    <div class="nav-item" data-view="week"><span class="dot"></span>By Week</div>
-    <div class="nav-item" data-view="month"><span class="dot"></span>By Month</div>
-    <div class="nav-item" data-view="all"><span class="dot"></span>All Activities</div>
+    <div class="nav-item active" data-view="latest"><span class="dot"></span>Latest</div>
+    <div class="nav-item" data-view="training"><span class="dot"></span>Training</div>
     <div class="nav-item" data-view="races"><span class="dot"></span>Races</div>
+    <div class="nav-item" data-view="chat"><span class="dot"></span>Chat</div>
   </nav>
 
   <main id="main">
     <div id="storage-banner" style="display:none" class="storage-banner">Private browsing detected — data won't persist between sessions.</div>
     <div id="error-container"></div>
 
-    <!-- Overview -->
-    <div id="view-overview" class="view">
-      <div class="page-title">Overview</div>
+    <!-- Latest -->
+    <div id="view-latest" class="view"></div>
 
-      <div class="section-label">2026 Goals</div>
-      <div class="goals-grid">
-        <div class="goal-card done">
-          <div class="goal-title">Half Marathon</div>
-          <div class="goal-target">Target: sub 1:25:00</div>
-          <div class="goal-result done">1:22:00</div>
-          <span class="goal-badge done">✓ Done</span>
-        </div>
-        <div class="goal-card done">
-          <div class="goal-title">Ironman 70.3</div>
-          <div class="goal-target">Target: sub 5:00</div>
-          <div class="goal-result done">4:56:00</div>
-          <span class="goal-badge done">✓ Done</span>
-        </div>
-        <div class="goal-card pending clickable" id="goal-hyrox" onclick="openHyroxOverviewModal()">
-          <div class="goal-title">Hyrox Single <span style="font-size:10px;color:var(--muted);font-weight:400">↗ details</span></div>
-          <div class="goal-target">Target: sub 1:00</div>
-          <div class="goal-result pending">1:03:35</div>
-          <span class="goal-badge pending">-03:35 to go</span>
-        </div>
-      </div>
-
-      <div class="section-label">Latest Workouts</div>
-      <div id="latest-workouts"></div>
-      <div class="view-all-link" onclick="showView('all')">View all workouts →</div>
-
-      <div class="section-label">Year to date</div>
-      <div class="metric-grid" id="m-grid"></div>
-
-      <div class="chart-card">
-        <div class="chart-header">
-          <div class="chart-title">Sessions by type</div>
-          <div class="toggle-group">
-            <button class="toggle-btn active" data-chart="sessions" data-period="month">Month</button>
-            <button class="toggle-btn" data-chart="sessions" data-period="week">Week</button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-sessions" height="200"></canvas></div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-header">
-          <div class="chart-title">Volume by type</div>
-          <div class="toggle-group">
-            <button class="toggle-btn active" data-chart="volume" data-period="month">Month</button>
-            <button class="toggle-btn" data-chart="volume" data-period="week">Week</button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-volume" height="200"></canvas></div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-header"><div class="chart-title">Race Timeline</div></div>
-        <div id="race-timeline" class="timeline"></div>
-      </div>
-    </div>
-
-    <!-- By Week -->
-    <div id="view-week" class="view" style="display:none">
-      <div class="page-title">By Week</div>
+    <!-- Training -->
+    <div id="view-training" class="view" style="display:none">
       <div class="pills-sticky">
-        <div id="week-pills" class="period-pills"></div>
+        <div id="training-month-pills" class="period-pills"></div>
       </div>
-      <div id="week-stats" class="period-stats"></div>
-      <div id="week-chips" class="type-chips"></div>
-      <div class="table-wrap"><table><thead id="week-thead"></thead><tbody id="week-tbody"></tbody></table></div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Sessions</div></div>
+        <div class="chart-wrap"><canvas id="chart-training-sessions" height="200"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Volume</div></div>
+        <div class="chart-wrap"><canvas id="chart-training-volume" height="200"></canvas></div>
+      </div>
+      <div id="training-stats" class="period-stats"></div>
+      <div id="training-chips" class="type-chips"></div>
+      <div class="table-wrap"><table><thead id="training-thead"></thead><tbody id="training-tbody"></tbody></table></div>
     </div>
 
-    <!-- By Month -->
-    <div id="view-month" class="view" style="display:none">
-      <div class="page-title">By Month</div>
-      <div class="pills-sticky">
-        <div id="month-pills" class="period-pills"></div>
-      </div>
-      <div id="month-stats" class="period-stats"></div>
-      <div id="month-chips" class="type-chips"></div>
-      <div class="table-wrap"><table><thead id="month-thead"></thead><tbody id="month-tbody"></tbody></table></div>
-    </div>
-
-    <!-- All Activities -->
-    <div id="view-all" class="view" style="display:none">
-      <div class="page-title">All Activities</div>
-      <div class="filter-sticky">
-        <div class="filter-btns" id="all-filters">
-          <button class="filter-btn active" data-type="All">All</button>
-          <button class="filter-btn" data-type="Run">Run</button>
-          <button class="filter-btn" data-type="Ride">Ride</button>
-          <button class="filter-btn" data-type="HIIT">HIIT</button>
-          <button class="filter-btn" data-type="Swim">Swim</button>
-        </div>
-      </div>
-      <div id="all-stats" class="period-stats"></div>
-      <div id="all-chips" class="type-chips"></div>
-      <div class="table-wrap"><table><thead id="all-thead"></thead><tbody id="all-tbody"></tbody></table></div>
-    </div>
+    <!-- Chat -->
+    <div id="view-chat" class="view" style="display:none"></div>
 
     <!-- Races -->
     <div id="view-races" class="view" style="display:none">
@@ -592,11 +514,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 
 <!-- Bottom tab bar -->
 <div id="tab-bar">
-  <button class="tab-btn active" data-view="overview"><span class="tab-icon">⊞</span>Overview</button>
-  <button class="tab-btn" data-view="week"><span class="tab-icon">📅</span>Week</button>
-  <button class="tab-btn" data-view="month"><span class="tab-icon">📆</span>Month</button>
-  <button class="tab-btn" data-view="all"><span class="tab-icon">≡</span>All</button>
+  <button class="tab-btn active" data-view="latest"><span class="tab-icon">⊞</span>Latest</button>
+  <button class="tab-btn" data-view="training"><span class="tab-icon">📊</span>Training</button>
   <button class="tab-btn" data-view="races"><span class="tab-icon">🏅</span>Races</button>
+  <button class="tab-btn" data-view="chat"><span class="tab-icon">💬</span>Chat</button>
 </div>
 
 <script>
@@ -1147,84 +1068,7 @@ document.getElementById('hyrox-overview-overlay').addEventListener('click',e=>{
   }
 });
 
-// ── Overview ──────────────────────────────────────────────────────────────────
-let sessionsChartPeriod='month', volumeChartPeriod='month';
-
-function renderOverview(){
-  // Latest workouts (3 most recent)
-  const sorted=[...activities].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
-  const lwEl=document.getElementById('latest-workouts');
-  if(!sorted.length){
-    lwEl.innerHTML='<div style="color:var(--muted);font-size:13px;margin-bottom:8px">No activities yet.</div>';
-  } else {
-    lwEl.innerHTML=sorted.map(a=>`
-      <div class="latest-workout-card" data-id="${a.id}">
-        ${typePill(a.type)}
-        <div class="latest-workout-info">
-          <div class="latest-workout-name">${a.name}</div>
-          <div class="latest-workout-meta">${fmtDate(a.date)} &nbsp;·&nbsp; ${fmtDuration(a.duration)}${a.distKm>0?' &nbsp;·&nbsp; '+a.distKm.toFixed(1)+' km':''}</div>
-        </div>
-      </div>
-    `).join('');
-    lwEl.querySelectorAll('.latest-workout-card').forEach(card=>{
-      card.addEventListener('click',()=>openDeepDive(card.dataset.id));
-    });
-  }
-
-  // Year to date metrics
-  const typeList=['Run','Ride','HIIT','Swim'];
-  document.getElementById('m-grid').innerHTML=typeList.map(t=>{
-    const acts=activities.filter(a=>a.type===t);
-    const hours=fmtHours(acts.reduce((s,a)=>s+a.duration,0));
-    return `<div class="metric-card">
-      <div class="metric-label">${t}</div>
-      <div class="metric-value">${acts.length}<span class="metric-unit">sessions</span></div>
-      <div class="metric-sub">${hours}h training</div>
-    </div>`;
-  }).join('');
-
-  renderSessionsChart();
-  renderVolumeChart();
-
-  // Race timeline
-  const races=[
-    {name:'Berlin Half Marathon',date:'29 Mar 2026',done:true},
-    {name:'Ironman 70.3 Lanzarote',date:'19 Apr 2026',done:true},
-    {name:'Hyrox Lisbon',date:'2 May 2026',done:true},
-    {name:'Hyrox Barcelona',date:'15 May 2026',done:true},
-    {name:'Hyrox Berlin',date:'30 May 2026',done:false}
-  ];
-  const tl=document.getElementById('race-timeline');
-  tl.innerHTML=races.map((r,i)=>`
-    <div class="tl-item">
-      <div style="display:flex;flex-direction:column;align-items:center;width:12px;flex-shrink:0">
-        <div class="tl-dot ${r.done?'done':'upcoming'}"></div>
-        ${i<races.length-1?`<div style="width:2px;height:32px;background:var(--border2);margin-top:2px"></div>`:''}
-      </div>
-      <div style="padding-bottom:${i<races.length-1?'8':'0'}px">
-        <div class="tl-name">${r.name}</div>
-        <div class="tl-date">${r.date}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderSessionsChart(){
-  const isWeek=sessionsChartPeriod==='week';
-  const {labels,datasets}=isWeek
-    ?periodChartData(activities,getWeekKey,weekLabel,false)
-    :periodChartData(activities,getMonthKey,monthLabel,false);
-  buildStackedBar('chart-sessions',labels,datasets,{weekly:isWeek});
-}
-function renderVolumeChart(){
-  const isWeek=volumeChartPeriod==='week';
-  const {labels,datasets}=isWeek
-    ?periodChartData(activities,getWeekKey,weekLabel,true)
-    :periodChartData(activities,getMonthKey,monthLabel,true);
-  buildStackedBar('chart-volume',labels,datasets,{isVolume:true,weekly:isWeek});
-}
-
-// ── Week / Month views ────────────────────────────────────────────────────────
+// ── Training view ─────────────────────────────────────────────────────────────
 function tableHeader(id){
   document.getElementById(id).innerHTML='<tr><th>Day</th><th>Date</th><th>Type</th><th>Name</th><th>Duration</th><th>Distance</th><th>HR</th></tr>';
 }
@@ -1267,38 +1111,50 @@ function typeChips(acts,containerId){
   }).join('');
 }
 
-function renderWeek(weekKey){
-  const acts=activities.filter(a=>getWeekKey(a.date)===weekKey);
-  periodStats(acts,'week-stats'); typeChips(acts,'week-chips');
-  tableHeader('week-thead'); activityRows(acts,'week-tbody');
-}
-function renderMonth(monthKey){
-  const acts=activities.filter(a=>a.date.startsWith(monthKey));
-  periodStats(acts,'month-stats'); typeChips(acts,'month-chips');
-  tableHeader('month-thead'); activityRows(acts,'month-tbody');
+// Returns sorted array of week-keys that overlap the given month (YYYY-MM)
+function weeksOverlappingMonth(monthKey){
+  const [y,mo]=monthKey.split('-').map(Number);
+  const days=new Date(y,mo,0).getDate(); // days in month
+  const weekKeys=new Set();
+  for(let d=1;d<=days;d++){
+    const date=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    weekKeys.add(getWeekKey(date));
+  }
+  return [...weekKeys].sort();
 }
 
-function initWeekView(){
-  const keys=[...new Set(activities.map(a=>getWeekKey(a.date)))].sort().reverse();
-  const pills=document.getElementById('week-pills');
-  pills.innerHTML=keys.map(k=>{
-    const label=new Date(k+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-    return `<div class="period-pill" data-week="${k}">W ${label}</div>`;
-  }).join('');
-  const latest=keys[0];
-  pills.querySelectorAll('.period-pill').forEach(p=>{
-    if(p.dataset.week===latest) p.classList.add('active');
-    p.addEventListener('click',()=>{
-      pills.querySelectorAll('.period-pill').forEach(x=>x.classList.remove('active'));
-      p.classList.add('active');
-      renderWeek(p.dataset.week);
-    });
-  });
-  if(latest) renderWeek(latest);
+function renderTrainingCharts(monthKey){
+  const weeks=weeksOverlappingMonth(monthKey);
+  const labels=weeks.map(k=>weekLabel(k));
+  const types=['Run','Ride','HIIT','Swim'];
+
+  destroyChart('chart-training-sessions');
+  const sessionDatasets=types.map(t=>({
+    label:t, backgroundColor:TYPE_COLORS[t],
+    data:weeks.map(k=>activities.filter(a=>getWeekKey(a.date)===k&&a.type===t).length)
+  }));
+  buildStackedBar('chart-training-sessions',labels,sessionDatasets,{weekly:true});
+
+  destroyChart('chart-training-volume');
+  const volumeDatasets=types.map(t=>({
+    label:t, backgroundColor:TYPE_COLORS[t],
+    data:weeks.map(k=>activities.filter(a=>getWeekKey(a.date)===k&&a.type===t).reduce((s,a)=>s+a.duration,0))
+  }));
+  buildStackedBar('chart-training-volume',labels,volumeDatasets,{isVolume:true,weekly:true});
 }
-function initMonthView(){
+
+function renderTraining(monthKey){
+  renderTrainingCharts(monthKey);
+  const acts=activities.filter(a=>a.date.startsWith(monthKey));
+  periodStats(acts,'training-stats');
+  typeChips(acts,'training-chips');
+  tableHeader('training-thead');
+  activityRows(acts,'training-tbody');
+}
+
+function initTrainingView(){
   const keys=[...new Set(activities.map(a=>getMonthKey(a.date)))].sort().reverse();
-  const pills=document.getElementById('month-pills');
+  const pills=document.getElementById('training-month-pills');
   pills.innerHTML=keys.map(k=>{
     const [y,m]=k.split('-');
     const label=new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
@@ -1310,35 +1166,10 @@ function initMonthView(){
     p.addEventListener('click',()=>{
       pills.querySelectorAll('.period-pill').forEach(x=>x.classList.remove('active'));
       p.classList.add('active');
-      renderMonth(p.dataset.month);
+      renderTraining(p.dataset.month);
     });
   });
-  if(latest) renderMonth(latest);
-}
-
-// ── All activities ────────────────────────────────────────────────────────────
-let allFilter='All';
-function renderAllActivities(){
-  const filtered=allFilter==='All'?activities:activities.filter(a=>a.type===allFilter);
-  periodStats(filtered,'all-stats');
-  typeChips(filtered,'all-chips');
-  document.getElementById('all-thead').innerHTML='<tr><th>Day</th><th>Date</th><th>Type</th><th>Name</th><th>Duration</th><th>Distance</th><th>HR</th></tr>';
-  const tbody=document.getElementById('all-tbody');
-  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date));
-  tbody.innerHTML=sorted.map(a=>`
-    <tr data-id="${a.id}">
-      <td class="mono">${weekday(a.date)}</td>
-      <td class="mono">${fmtDate(a.date)}</td>
-      <td>${typePill(a.type)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${a.name}</td>
-      <td class="mono">${fmtDuration(a.duration)}</td>
-      <td class="mono">${a.distKm>0?a.distKm.toFixed(1)+' km':'—'}</td>
-      <td class="mono">${a.hr?Math.round(a.hr)+' bpm':'—'}</td>
-    </tr>
-  `).join('');
-  tbody.querySelectorAll('tr').forEach(tr=>{
-    tr.addEventListener('click',()=>openDeepDive(tr.dataset.id));
-  });
+  if(latest) renderTraining(latest);
 }
 
 // ── Races view ────────────────────────────────────────────────────────────────
@@ -1766,7 +1597,7 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-let currentView='overview';
+let currentView='latest';
 let viewInited={};
 
 function showView(name){
@@ -1777,34 +1608,12 @@ function showView(name){
   currentView=name; prevView=name;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===name));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
-  if(name==='overview'&&!viewInited.overview){ renderOverview(); viewInited.overview=true; }
-  if(name==='week'&&!viewInited.week){ initWeekView(); viewInited.week=true; }
-  if(name==='month'&&!viewInited.month){ initMonthView(); viewInited.month=true; }
-  if(name==='all'&&!viewInited.all){ renderAllActivities(); viewInited.all=true; }
+  if(name==='training'&&!viewInited.training){ initTrainingView(); viewInited.training=true; }
   if(name==='races'&&!viewInited.races){ renderRaces(); viewInited.races=true; }
 }
 
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>showView(n.dataset.view)));
 document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-
-document.querySelectorAll('.toggle-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const chart=btn.dataset.chart, period=btn.dataset.period;
-    btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    if(chart==='sessions'){ sessionsChartPeriod=period; renderSessionsChart(); }
-    if(chart==='volume'){ volumeChartPeriod=period; renderVolumeChart(); }
-  });
-});
-
-document.querySelectorAll('#all-filters .filter-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('#all-filters .filter-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    allFilter=btn.dataset.type;
-    renderAllActivities();
-  });
-});
 
 // ── Error handling ────────────────────────────────────────────────────────────
 function showError(msg){
@@ -1845,11 +1654,11 @@ async function init(){
   try{
     activities=await fetchAllActivities(token);
     loadDone();
-    showView('overview');
+    showView('latest');
   } catch(e){
     loadDone();
     document.getElementById('app').style.display='flex';
-    showView('overview');
+    showView('latest');
     showError('Failed to load activities: '+e.message);
   }
 }
