@@ -126,6 +126,11 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 .view-all-link{font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:20px;display:inline-block}
 .view-all-link:hover{color:var(--text)}
 
+/* Analysis cards */
+.analysis-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.analysis-label{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);margin-bottom:6px;font-weight:500}
+.analysis-text{font-size:13px;color:var(--text);line-height:1.65;margin:0}
+
 /* Race carousel */
 .race-carousel{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:24px}
 .race-carousel::-webkit-scrollbar{display:none}
@@ -342,7 +347,12 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <div id="error-container"></div>
 
     <!-- Latest -->
-    <div id="view-latest" class="view"></div>
+    <div id="view-latest" class="view">
+      <div class="section-label" style="margin-bottom:12px">Latest 5 Workouts</div>
+      <div id="latest-list"></div>
+      <div class="section-label" style="margin-top:8px;margin-bottom:12px">Assessment</div>
+      <div id="latest-analysis"></div>
+    </div>
 
     <!-- Training -->
     <div id="view-training" class="view" style="display:none">
@@ -1596,6 +1606,109 @@ document.addEventListener('keydown',e=>{
   }
 });
 
+// ── Latest view ───────────────────────────────────────────────────────────────
+function daysBetween(d1,d2){
+  return Math.round(Math.abs(new Date(d1+'T12:00:00')-new Date(d2+'T12:00:00'))/864e5);
+}
+
+function latestFreqPara(recent,before){
+  if(recent.length<2) return 'Not enough recent data to assess frequency.';
+  const span5=daysBetween(recent[0].date,recent[recent.length-1].date);
+  const avgGap5=(span5/(recent.length-1)).toFixed(1);
+  if(before.length<2){
+    return `Your last ${recent.length} workouts spanned ${span5} day${span5!==1?'s':''}, averaging one session every ${avgGap5} days. No earlier data available for comparison.`;
+  }
+  const span20=daysBetween(before[0].date,before[before.length-1].date);
+  const avgGap20=(span20/(before.length-1)).toFixed(1);
+  const diff=parseFloat(avgGap20)-parseFloat(avgGap5);
+  let trendNote;
+  if(diff>0.7) trendNote=`That's more frequent than the prior 20 (one every ${avgGap20} days) — a positive trend.`;
+  else if(diff<-0.7) trendNote=`That's less frequent than the prior 20 (one every ${avgGap20} days) — worth keeping an eye on.`;
+  else trendNote=`That's consistent with the prior 20 (one every ${avgGap20} days) — steady frequency.`;
+  return `Your last ${recent.length} workouts spanned ${span5} day${span5!==1?'s':''}, averaging one session every ${avgGap5} days. ${trendNote}`;
+}
+
+function latestTypePara(recent,before){
+  function countTypes(arr){ const m={}; arr.forEach(a=>{ m[a.type]=(m[a.type]||0)+1; }); return m; }
+  function fmt(m,total){ return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${t} ${Math.round(n/total*100)}%`).join(', '); }
+  const rc=countTypes(recent), bc=countTypes(before);
+  const rFmt=fmt(rc,recent.length);
+  if(!before.length) return `Your last ${recent.length} workouts: ${rFmt}. No prior data to compare.`;
+  const bFmt=fmt(bc,before.length);
+  const types=[...new Set([...Object.keys(rc),...Object.keys(bc)])];
+  let top=null,topD=0;
+  types.forEach(t=>{ const d=Math.abs((rc[t]||0)/recent.length-(bc[t]||0)/before.length); if(d>topD){ topD=d; top=t; } });
+  let extra='';
+  if(top&&topD>0.18){
+    const more=(rc[top]||0)/recent.length>(bc[top]||0)/before.length;
+    extra=` You've leaned ${more?'into':'away from'} ${top.toLowerCase()} recently.`;
+  }
+  return `Recent split: ${rFmt}. Prior 20: ${bFmt}.${extra}`;
+}
+
+function latestHRPara(recent,allSorted){
+  const withHR=recent.filter(a=>a.hr>0);
+  if(!withHR.length) return 'No heart rate data recorded for your recent workouts.';
+  const newestDate=new Date(allSorted[0].date+'T12:00:00');
+  const lo=new Date(newestDate); lo.setMonth(lo.getMonth()-18);
+  const hi=new Date(newestDate); hi.setMonth(hi.getMonth()-6);
+  const compares=[];
+  withHR.forEach(a=>{
+    const hist=allSorted.filter(h=>{
+      if(h.hr<=0||h.id===a.id) return false;
+      const d=new Date(h.date+'T12:00:00');
+      return d>=lo&&d<=hi&&h.type===a.type&&a.duration>0&&h.duration/a.duration>=0.75&&h.duration/a.duration<=1.25;
+    });
+    if(hist.length>=2) compares.push({type:a.type,nowHR:Math.round(a.hr),thenHR:Math.round(hist.reduce((s,h)=>s+h.hr,0)/hist.length),n:hist.length});
+  });
+  const avgNowHR=Math.round(withHR.reduce((s,a)=>s+a.hr,0)/withHR.length);
+  if(!compares.length){
+    return `Average HR across recent sessions: ${avgNowHR} bpm. No comparable workouts found from 6–18 months ago to benchmark against.`;
+  }
+  const byType={};
+  compares.forEach(c=>{ if(!byType[c.type]) byType[c.type]=[]; byType[c.type].push(c); });
+  const parts=Object.entries(byType).map(([t,cs])=>{
+    const nowAvg=Math.round(cs.reduce((s,c)=>s+c.nowHR,0)/cs.length);
+    const thenAvg=Math.round(cs.reduce((s,c)=>s+c.thenHR,0)/cs.length);
+    const diff=nowAvg-thenAvg;
+    const dir=diff<-3?`${-diff} bpm lower`:diff>3?`${diff} bpm higher`:'about the same';
+    return `${t}: ${nowAvg} bpm now vs ${thenAvg} bpm a year ago (${dir})`;
+  });
+  const overallDiff=compares.reduce((s,c)=>s+(c.nowHR-c.thenHR),0)/compares.length;
+  const verdict=overallDiff<-4?' Trending down on comparable efforts — a good sign for aerobic fitness.':overallDiff>4?' Slightly elevated vs a year ago — could reflect higher load or accumulated fatigue.':' HR on comparable efforts is largely unchanged from a year ago.';
+  return parts.join('. ')+'.'+verdict;
+}
+
+function renderLatest(){
+  const listEl=document.getElementById('latest-list');
+  const anaEl=document.getElementById('latest-analysis');
+  if(!listEl||!anaEl) return;
+  if(!activities.length){
+    listEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No activities loaded yet.</div>';
+    anaEl.innerHTML='';
+    return;
+  }
+  const sorted=[...activities].sort((a,b)=>b.date.localeCompare(a.date));
+  const recent=sorted.slice(0,5);
+  const before=sorted.slice(5,25);
+  listEl.innerHTML=recent.map(a=>`
+    <div class="latest-workout-card" data-id="${a.id}">
+      <div class="latest-workout-info">
+        <div class="latest-workout-name">${a.name}</div>
+        <div class="latest-workout-meta">${weekday(a.date)} ${fmtDate(a.date)} · ${fmtDuration(a.duration)}${a.distKm>0?' · '+a.distKm.toFixed(1)+' km':''}${a.hr?' · '+Math.round(a.hr)+' bpm':''}</div>
+      </div>
+      <div class="latest-workout-right">${typePill(a.type)}</div>
+    </div>`).join('');
+  listEl.querySelectorAll('.latest-workout-card').forEach(card=>{
+    card.addEventListener('click',()=>openDeepDive(card.dataset.id));
+  });
+  anaEl.innerHTML=[
+    {label:'Frequency',text:latestFreqPara(recent,before)},
+    {label:'Type split',text:latestTypePara(recent,before)},
+    {label:'Heart rate',text:latestHRPara(recent,sorted)}
+  ].map(p=>`<div class="analysis-card"><div class="analysis-label">${p.label}</div><p class="analysis-text">${p.text}</p></div>`).join('');
+}
+
 // ── Navigation ────────────────────────────────────────────────────────────────
 let currentView='latest';
 let viewInited={};
@@ -1608,6 +1721,7 @@ function showView(name){
   currentView=name; prevView=name;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===name));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  if(name==='latest'){ renderLatest(); }
   if(name==='training'&&!viewInited.training){ initTrainingView(); viewInited.training=true; }
   if(name==='races'&&!viewInited.races){ renderRaces(); viewInited.races=true; }
 }
