@@ -205,6 +205,16 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 #hyrox-overview-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
 .ov-modal-body{flex:1;overflow-y:auto;padding:20px 24px 32px}
 
+/* Training month picker */
+.training-header-sticky{position:sticky;top:0;z-index:10;background:var(--bg);padding-top:8px;margin-top:-8px;margin-bottom:0}
+.training-header-row{display:flex;justify-content:flex-end;margin-bottom:14px}
+.btn-month-pick{padding:7px 14px;background:#FC4C02;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:opacity 0.15s}
+.btn-month-pick:hover{opacity:0.88}
+.month-dropdown{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:6px}
+.month-drop-pill{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace;white-space:nowrap}
+.month-drop-pill:hover{background:var(--surface2);color:var(--text)}
+.month-drop-pill.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+
 /* Races layout */
 .races-add-row{display:flex;justify-content:flex-end;margin-bottom:20px;position:sticky;top:0;z-index:10;background:var(--bg);padding:8px 0;margin-top:-8px}
 .race-section{margin-bottom:28px}
@@ -356,9 +366,13 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 
     <!-- Training -->
     <div id="view-training" class="view" style="display:none">
-      <div class="pills-sticky">
-        <div id="training-month-pills" class="period-pills"></div>
+      <div class="training-header-sticky">
+        <div class="training-header-row">
+          <button class="btn-month-pick" id="training-month-btn">Loading…</button>
+        </div>
+        <div id="training-month-dropdown" class="month-dropdown" style="display:none"></div>
       </div>
+      <div id="training-stats" class="period-stats" style="margin-bottom:20px"></div>
       <div class="chart-card">
         <div class="chart-header"><div class="chart-title">Sessions</div></div>
         <div class="chart-wrap"><canvas id="chart-training-sessions" height="200"></canvas></div>
@@ -367,8 +381,6 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <div class="chart-header"><div class="chart-title">Volume</div></div>
         <div class="chart-wrap"><canvas id="chart-training-volume" height="200"></canvas></div>
       </div>
-      <div id="training-stats" class="period-stats"></div>
-      <div id="training-chips" class="type-chips"></div>
       <div class="table-wrap"><table><thead id="training-thead"></thead><tbody id="training-tbody"></tbody></table></div>
     </div>
 
@@ -1157,29 +1169,41 @@ function renderTraining(monthKey){
   renderTrainingCharts(monthKey);
   const acts=activities.filter(a=>a.date.startsWith(monthKey));
   periodStats(acts,'training-stats');
-  typeChips(acts,'training-chips');
   tableHeader('training-thead');
   activityRows(acts,'training-tbody');
 }
 
 function initTrainingView(){
   const keys=[...new Set(activities.map(a=>getMonthKey(a.date)))].sort().reverse();
-  const pills=document.getElementById('training-month-pills');
-  pills.innerHTML=keys.map(k=>{
+  const currentMonthKey=new Date().toISOString().slice(0,7);
+  const defaultKey=keys.includes(currentMonthKey)?currentMonthKey:(keys[0]||currentMonthKey);
+  const btn=document.getElementById('training-month-btn');
+  const dropdown=document.getElementById('training-month-dropdown');
+
+  function setMonth(k){
     const [y,m]=k.split('-');
-    const label=new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-    return `<div class="period-pill" data-month="${k}">${label}</div>`;
+    btn.textContent=new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'})+' ▾';
+    dropdown.querySelectorAll('.month-drop-pill').forEach(p=>p.classList.toggle('active',p.dataset.month===k));
+    dropdown.style.display='none';
+    renderTraining(k);
+  }
+
+  dropdown.innerHTML=keys.map(k=>{
+    const [y,m]=k.split('-');
+    return `<div class="month-drop-pill" data-month="${k}">${new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</div>`;
   }).join('');
-  const latest=keys[0];
-  pills.querySelectorAll('.period-pill').forEach(p=>{
-    if(p.dataset.month===latest) p.classList.add('active');
-    p.addEventListener('click',()=>{
-      pills.querySelectorAll('.period-pill').forEach(x=>x.classList.remove('active'));
-      p.classList.add('active');
-      renderTraining(p.dataset.month);
-    });
+  dropdown.querySelectorAll('.month-drop-pill').forEach(p=>{
+    p.addEventListener('click',()=>setMonth(p.dataset.month));
   });
-  if(latest) renderTraining(latest);
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    dropdown.style.display=dropdown.style.display==='none'?'flex':'none';
+  });
+  document.addEventListener('click',e=>{
+    if(!btn.contains(e.target)&&!dropdown.contains(e.target)) dropdown.style.display='none';
+  });
+
+  if(keys.length) setMonth(defaultKey);
 }
 
 // ── Races view ────────────────────────────────────────────────────────────────
