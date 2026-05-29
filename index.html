@@ -566,6 +566,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <input class="form-input" id="pr-title" type="text" placeholder="e.g. Berlin 2026">
       </div>
       <div class="form-field">
+        <label class="form-label">Race Date (optional)</label>
+        <input class="form-input" id="pr-date" type="date">
+      </div>
+      <div class="form-field">
         <label class="form-label">Location (optional)</label>
         <input class="form-input" id="pr-location" type="text" placeholder="e.g. Messe Berlin, Germany">
       </div>
@@ -1781,34 +1785,54 @@ async function fetchPreviewData(profileUrl,onProgress){
   const allAthletes=[...athletes1,...moreHtmls.flatMap(parseStartlistPage)];
   const day=self.day||athletes1[0]?.day||'';
   const waveAthletes=allAthletes.filter(a=>a.wave===wave||a.wave.includes(wave));
-  return{day,totalParticipants:allAthletes.length,waveAthletes,selfName:self.name,selfBib:self.bib,wave};
+  return{day,totalParticipants:allAthletes.length,waveAthletes,selfName:self.name,selfBib:self.bib,selfAge:self.age,wave};
 }
 
+function fmtHyroxName(name){
+  if(!name) return '';
+  const comma=name.indexOf(',');
+  if(comma<0) return name;
+  return name.slice(comma+1).trim()+' '+name.slice(0,comma).trim();
+}
+function fmtPreviewDate(iso){
+  if(!iso) return '';
+  return new Date(iso+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+}
 function previewCardHtml(p){
   const accent=p.color?'accent-'+p.color:'';
-  const targetLine=p.targetSecs>0
-    ?`<div class="hyrox-target-line">Target: ${fmtSecsDisplay(p.targetSecs)}</div>`
-    :`<div class="hyrox-target-line" style="color:var(--muted2)">No target set</div>`;
-  const note=p.notes?`<div class="card-note">${p.notes}</div>`:'';
+  const dayDateStr=[p.day,fmtPreviewDate(p.raceDate)].filter(Boolean).join(', ');
+  const inWaveAge=(p.selfAge&&p.waveAthletes)
+    ?p.waveAthletes.filter(a=>a.age===p.selfAge).length
+    :null;
+  const note=p.notes?`<div class="card-note" style="margin-top:10px">${p.notes}</div>`:'';
   const mapSrc=p.location
-    ?`https://maps.google.com/maps?q=${encodeURIComponent(p.location)}&output=embed`
+    ?`https://maps.google.com/maps?q=${encodeURIComponent(p.location)}&output=embed&z=8`
     :'';
   const mapHtml=mapSrc
     ?`<iframe class="preview-map" src="${mapSrc}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Event location"></iframe>`
     :'';
+  const statRow=(label,val)=>
+    `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
+      <span style="color:var(--muted)">${label}</span><strong>${val}</strong>
+    </div>`;
   return `<div class="hyrox-card ${accent}" data-id="${p.id}">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <div class="hyrox-race-name" style="flex:1">${p.title}</div>
       <div class="card-actions">
         <button class="card-action-btn preview-detail" data-id="${p.id}" title="Wave detail">→</button>
         <button class="card-action-btn del preview-del" data-id="${p.id}" title="Delete">🗑️</button>
       </div>
     </div>
-    <div class="hyrox-date">${p.day||'—'}</div>
-    ${targetLine}
-    <div class="preview-meta-row" style="margin-top:8px"><span>Total field</span><span class="preview-meta-val">${p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—'}</span></div>
-    <div class="preview-meta-row"><span>In wave</span><span class="preview-meta-val">${p.waveAthletes?.length??'—'}</span></div>
-    <div style="font-size:10px;color:var(--muted2);font-family:'DM Mono',monospace;margin-top:4px">${p.startwave}</div>
+    ${dayDateStr?`<div style="font-size:13px;color:var(--muted);margin-bottom:6px">${dayDateStr}</div>`:''}
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      ${p.selfName?`<span style="font-size:13px;font-weight:500">${fmtHyroxName(p.selfName)}</span>`:''}
+      ${p.startwave?`<span style="font-size:13px;color:var(--muted)">${p.startwave}</span>`:''}
+    </div>
+    ${p.targetSecs>0?`<div style="font-size:13px;color:var(--muted);margin-bottom:2px">Target <strong style="color:var(--text)">${fmtSecsDisplay(p.targetSecs)}</strong></div>`:''}
+    <div style="margin:12px 0 8px;border-top:1px solid var(--border)"></div>
+    ${statRow('Total participants', p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—')}
+    ${statRow('In wave', p.waveAthletes?.length??'—')}
+    ${inWaveAge!=null?statRow(`In wave (${p.selfAge})`, inWaveAge):''}
     ${note}
     ${mapHtml}
   </div>`;
@@ -1883,6 +1907,7 @@ function setPreviewSwatchColor(color){
 }
 function openAddPreviewModal(){
   document.getElementById('pr-profile-url').value='';
+  document.getElementById('pr-date').value='';
   document.getElementById('pr-location').value='';
   document.getElementById('pr-title').value='';
   document.getElementById('pr-target').value='';
@@ -1904,6 +1929,7 @@ document.getElementById('pr-color-swatches').querySelectorAll('.color-swatch').f
 document.getElementById('save-preview').addEventListener('click',async()=>{
   const profileUrl=document.getElementById('pr-profile-url').value.trim();
   const title=document.getElementById('pr-title').value.trim();
+  const raceDate=document.getElementById('pr-date').value.trim();
   const location=document.getElementById('pr-location').value.trim();
   const targetInput=document.getElementById('pr-target').value.trim();
   const notes=document.getElementById('pr-notes').value.trim();
@@ -1917,8 +1943,8 @@ document.getElementById('save-preview').addEventListener('click',async()=>{
     });
     const preview={
       id:'preview_'+Date.now(),
-      title, profileUrl, location, startwave:data.wave,
-      selfName:data.selfName, selfBib:data.selfBib,
+      title, profileUrl, raceDate, location, startwave:data.wave,
+      selfName:data.selfName, selfBib:data.selfBib, selfAge:data.selfAge,
       targetSecs:parseTargetInput(targetInput),
       notes,color:selectedPreviewColor,
       day:data.day,
