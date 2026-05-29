@@ -1785,7 +1785,8 @@ async function fetchPreviewData(profileUrl,onProgress){
   const allAthletes=[...athletes1,...moreHtmls.flatMap(parseStartlistPage)];
   const day=self.day||athletes1[0]?.day||'';
   const waveAthletes=allAthletes.filter(a=>a.wave===wave||a.wave.includes(wave));
-  return{day,totalParticipants:allAthletes.length,waveAthletes,selfName:self.name,selfBib:self.bib,selfAge:self.age,wave};
+  const totalInAgeGroup=self.age?allAthletes.filter(a=>a.age===self.age).length:null;
+  return{day,totalParticipants:allAthletes.length,totalInAgeGroup,waveAthletes,selfName:self.name,selfBib:self.bib,selfAge:self.age,wave};
 }
 
 function fmtHyroxName(name){
@@ -1804,9 +1805,10 @@ function previewCardHtml(p){
   const inWaveAge=(p.selfAge&&p.waveAthletes)
     ?p.waveAthletes.filter(a=>a.age===p.selfAge).length
     :null;
+  const totalInAgeGroup=p.totalInAgeGroup??null;
   const note=p.notes?`<div class="card-note" style="margin-top:10px">${p.notes}</div>`:'';
   const mapSrc=p.location
-    ?`https://maps.google.com/maps?q=${encodeURIComponent(p.location)}&output=embed&z=8`
+    ?`https://maps.google.com/maps?q=${encodeURIComponent(p.location)}&output=embed&z=12`
     :'';
   const mapHtml=mapSrc
     ?`<iframe class="preview-map" src="${mapSrc}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Event location"></iframe>`
@@ -1831,6 +1833,7 @@ function previewCardHtml(p){
     ${p.targetSecs>0?`<div style="font-size:13px;color:var(--muted);margin-bottom:2px">Target <strong style="color:var(--text)">${fmtSecsDisplay(p.targetSecs)}</strong></div>`:''}
     <div style="margin:12px 0 8px;border-top:1px solid var(--border)"></div>
     ${statRow('Total participants', p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—')}
+    ${totalInAgeGroup!=null?statRow(`Total in age group (${p.selfAge})`, totalInAgeGroup.toLocaleString()):''}
     ${statRow('In wave', p.waveAthletes?.length??'—')}
     ${inWaveAge!=null?statRow(`In wave (${p.selfAge})`, inWaveAge):''}
     ${note}
@@ -1944,7 +1947,7 @@ document.getElementById('save-preview').addEventListener('click',async()=>{
     const preview={
       id:'preview_'+Date.now(),
       title, profileUrl, raceDate, location, startwave:data.wave,
-      selfName:data.selfName, selfBib:data.selfBib, selfAge:data.selfAge,
+      selfName:data.selfName, selfBib:data.selfBib, selfAge:data.selfAge, totalInAgeGroup:data.totalInAgeGroup,
       targetSecs:parseTargetInput(targetInput),
       notes,color:selectedPreviewColor,
       day:data.day,
