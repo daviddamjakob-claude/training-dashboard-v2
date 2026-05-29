@@ -315,6 +315,14 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 #add-preview-overlay.open{display:flex}
 #add-preview-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
 
+/* Preview card vertical stack */
+.preview-card-list{display:flex;flex-direction:column;gap:16px;margin-bottom:24px}
+.preview-card-list .hyrox-card{width:100%;box-sizing:border-box}
+.preview-card-list .hyrox-race-name{white-space:normal}
+.card-action-btn.preview-detail{background:#FC4C02;border-color:#FC4C02;color:#fff;width:auto;padding:0 10px;font-size:13px;font-weight:600;letter-spacing:-0.01em}
+.card-action-btn.preview-detail:hover{opacity:0.88;background:#FC4C02}
+.preview-map{width:100%;height:160px;border:0;border-radius:8px;margin-top:14px;display:block}
+
 /* Wave detail page */
 .wave-detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .wave-table{width:100%;border-collapse:collapse}
@@ -556,6 +564,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
       <div class="form-field">
         <label class="form-label">Title *</label>
         <input class="form-input" id="pr-title" type="text" placeholder="e.g. Berlin 2026">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Location (optional)</label>
+        <input class="form-input" id="pr-location" type="text" placeholder="e.g. Messe Berlin, Germany">
       </div>
       <div class="form-field">
         <label class="form-label">Target Time (optional)</label>
@@ -1777,12 +1789,18 @@ function previewCardHtml(p){
   const targetLine=p.targetSecs>0
     ?`<div class="hyrox-target-line">Target: ${fmtSecsDisplay(p.targetSecs)}</div>`
     :`<div class="hyrox-target-line" style="color:var(--muted2)">No target set</div>`;
-  const note=`<div class="card-note">${p.notes||''}</div>`;
+  const note=p.notes?`<div class="card-note">${p.notes}</div>`:'';
+  const mapSrc=p.location
+    ?`https://maps.google.com/maps?q=${encodeURIComponent(p.location)}&output=embed`
+    :'';
+  const mapHtml=mapSrc
+    ?`<iframe class="preview-map" src="${mapSrc}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Event location"></iframe>`
+    :'';
   return `<div class="hyrox-card ${accent}" data-id="${p.id}">
-    <div style="display:flex;align-items:center;margin-bottom:2px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
       <div class="hyrox-race-name" style="flex:1">${p.title}</div>
       <div class="card-actions">
-        <button class="card-action-btn preview-detail" data-id="${p.id}" title="Wave detail">👥</button>
+        <button class="card-action-btn preview-detail" data-id="${p.id}" title="Wave detail">→</button>
         <button class="card-action-btn del preview-del" data-id="${p.id}" title="Delete">🗑️</button>
       </div>
     </div>
@@ -1792,6 +1810,7 @@ function previewCardHtml(p){
     <div class="preview-meta-row"><span>In wave</span><span class="preview-meta-val">${p.waveAthletes?.length??'—'}</span></div>
     <div style="font-size:10px;color:var(--muted2);font-family:'DM Mono',monospace;margin-top:4px">${p.startwave}</div>
     ${note}
+    ${mapHtml}
   </div>`;
 }
 
@@ -1803,7 +1822,7 @@ function renderPreviews(){
     el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No race previews yet — add your first one above.</div>';
     return;
   }
-  el.innerHTML=`<div class="race-carousel">${previews.map(previewCardHtml).join('')}</div>`;
+  el.innerHTML=`<div class="preview-card-list">${previews.map(previewCardHtml).join('')}</div>`;
   el.querySelectorAll('.preview-detail').forEach(btn=>{
     btn.addEventListener('click',e=>{ e.stopPropagation(); openWaveDetail(btn.dataset.id); });
   });
@@ -1864,6 +1883,7 @@ function setPreviewSwatchColor(color){
 }
 function openAddPreviewModal(){
   document.getElementById('pr-profile-url').value='';
+  document.getElementById('pr-location').value='';
   document.getElementById('pr-title').value='';
   document.getElementById('pr-target').value='';
   document.getElementById('pr-notes').value='';
@@ -1884,6 +1904,7 @@ document.getElementById('pr-color-swatches').querySelectorAll('.color-swatch').f
 document.getElementById('save-preview').addEventListener('click',async()=>{
   const profileUrl=document.getElementById('pr-profile-url').value.trim();
   const title=document.getElementById('pr-title').value.trim();
+  const location=document.getElementById('pr-location').value.trim();
   const targetInput=document.getElementById('pr-target').value.trim();
   const notes=document.getElementById('pr-notes').value.trim();
   if(!profileUrl){ alert('Please paste your personal profile link.'); return; }
@@ -1896,7 +1917,7 @@ document.getElementById('save-preview').addEventListener('click',async()=>{
     });
     const preview={
       id:'preview_'+Date.now(),
-      title, profileUrl, startwave:data.wave,
+      title, profileUrl, location, startwave:data.wave,
       selfName:data.selfName, selfBib:data.selfBib,
       targetSecs:parseTargetInput(targetInput),
       notes,color:selectedPreviewColor,
