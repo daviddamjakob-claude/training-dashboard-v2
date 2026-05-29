@@ -306,6 +306,23 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 #lightbox-prev:hover,#lightbox-next:hover{background:rgba(255,255,255,0.28)}
 #lightbox-counter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.7);font-size:12px;font-family:'DM Mono',monospace}
 
+/* Get Ready preview cards */
+.preview-meta-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:3px}
+.preview-meta-val{font-weight:500;color:var(--text)}
+
+/* Add-preview overlay (same structure as add-race-overlay) */
+#add-preview-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
+#add-preview-overlay.open{display:flex}
+#add-preview-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:540px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
+
+/* Wave detail page */
+.wave-detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.wave-table{width:100%;border-collapse:collapse}
+.wave-table th{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);padding:10px 12px;text-align:left;font-weight:500;background:var(--surface2);white-space:nowrap}
+.wave-table td{padding:9px 12px;font-size:13px;border-top:1px solid var(--border);white-space:nowrap}
+.wave-table tr.self td{font-weight:600;color:#b45309}
+.wave-table tr.self{background:linear-gradient(90deg,#fff7ed,var(--surface))}
+
 @media(max-width:700px){
   #lightbox-prev{left:8px}
   #lightbox-next{right:8px}
@@ -349,7 +366,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <div class="nav-item active" data-view="latest"><span class="dot"></span>Latest</div>
     <div class="nav-item" data-view="training"><span class="dot"></span>Training</div>
     <div class="nav-item" data-view="races"><span class="dot"></span>Races</div>
-    <div class="nav-item" data-view="chat"><span class="dot"></span>Chat</div>
+    <div class="nav-item" data-view="chat"><span class="dot"></span>Get Ready</div>
   </nav>
 
   <main id="main">
@@ -386,8 +403,14 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
       <div class="table-wrap"><table><thead id="training-thead"></thead><tbody id="training-tbody"></tbody></table></div>
     </div>
 
-    <!-- Chat -->
-    <div id="view-chat" class="view" style="display:none"></div>
+    <!-- Get Ready -->
+    <div id="view-chat" class="view" style="display:none">
+      <div class="races-add-row">
+        <button class="btn-add-race" id="open-add-preview-btn">+ Add Race Preview</button>
+      </div>
+      <div class="races-title">Upcoming Races</div>
+      <div id="preview-sections"></div>
+    </div>
 
     <!-- Races -->
     <div id="view-races" class="view" style="display:none">
@@ -401,6 +424,12 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <div id="deep-dive">
       <div class="dd-back" id="dd-back">← Back</div>
       <div id="dd-content"></div>
+    </div>
+
+    <!-- Wave Detail -->
+    <div id="wave-detail" style="display:none">
+      <div class="dd-back" id="wave-detail-back">← Back</div>
+      <div id="wave-detail-content"></div>
     </div>
   </main>
 </div>
@@ -507,6 +536,57 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
   </div>
 </div>
 
+<!-- Add Race Preview modal -->
+<div id="add-preview-overlay">
+  <div id="add-preview-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Add Race Preview</div>
+      <button class="modal-close" id="add-preview-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="race-type-toggle">
+        <div class="race-type-btn active">Hyrox Race</div>
+        <div class="race-type-btn" style="opacity:0.4;pointer-events:none">Other Race</div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Start List URL *</label>
+        <input class="form-input" id="pr-url" type="url" placeholder="Paste startlist.hyrox.com link (with &event=…)">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Startwave *</label>
+        <input class="form-input" id="pr-wave" type="text" placeholder="e.g. 8:10 HYROX MEN">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Title *</label>
+        <input class="form-input" id="pr-title" type="text" placeholder="e.g. Berlin 2026">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Target Time (optional)</label>
+        <input class="form-input" id="pr-target" type="text" placeholder="e.g. 1:00:00">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-textarea" id="pr-notes" placeholder="Any notes about the race…"></textarea>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Card colour</label>
+        <div class="color-swatches" id="pr-color-swatches">
+          <div class="color-swatch active" data-color="" style="background:#f3f4f6" title="Default"></div>
+          <div class="color-swatch" data-color="orange" style="background:#fed7aa" title="Orange"></div>
+          <div class="color-swatch" data-color="green" style="background:#bbf7d0" title="Green"></div>
+          <div class="color-swatch" data-color="blue" style="background:#bfdbfe" title="Blue"></div>
+          <div class="color-swatch" data-color="purple" style="background:#ddd6fe" title="Purple"></div>
+          <div class="color-swatch" data-color="red" style="background:#fecaca" title="Red"></div>
+          <div class="color-swatch" data-color="yellow" style="background:#fde68a" title="Yellow"></div>
+        </div>
+      </div>
+      <button class="btn-orange" id="save-preview">Fetch &amp; Save</button>
+      <div class="form-note">Paste the startlist.hyrox.com URL including the <code>&amp;event=…</code> parameter — your wave will be fetched and stored automatically.</div>
+    </div>
+  </div>
+</div>
+
 <!-- Gallery overlay -->
 <div id="gallery-overlay">
   <div id="gallery-modal">
@@ -541,7 +621,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
   <button class="tab-btn active" data-view="latest"><span class="tab-icon">⊞</span>Latest</button>
   <button class="tab-btn" data-view="training"><span class="tab-icon">📊</span>Training</button>
   <button class="tab-btn" data-view="races"><span class="tab-icon">🏅</span>Races</button>
-  <button class="tab-btn" data-view="chat"><span class="tab-icon">💬</span>Chat</button>
+  <button class="tab-btn" data-view="chat"><span class="tab-icon">🎯</span>Get Ready</button>
 </div>
 
 <script>
@@ -1632,6 +1712,205 @@ document.addEventListener('keydown',e=>{
   }
 });
 
+// ── Get Ready (race previews) ─────────────────────────────────────────────────
+const MY_NAME_FRAGMENT = 'Damjakob';
+
+function loadAllPreviews(){ const r=store.get('all_previews'); return r?JSON.parse(r):[]; }
+function saveAllPreviews(p){ store.set('all_previews',JSON.stringify(p)); }
+
+function parseStartlistPage(html){
+  const athletes=[];
+  const nameRe=/type-fullname"><a href="[^"]+">([^<]+)<\/a>/g;
+  const detailRe=/Bib no\.<\/div>(\d+)<\/div>[\s\S]*?Age Group<\/div>([^<]+)<\/div>[\s\S]*?Day<\/div>([^<]+)<\/div>[\s\S]*?Startwave<\/div>([^<]+)<\/div>/g;
+  const names=[...html.matchAll(nameRe)].map(m=>m[1].trim());
+  const details=[...html.matchAll(detailRe)].map(m=>({bib:m[1],age:m[2].trim(),day:m[3].trim(),wave:m[4].trim()}));
+  for(let i=0;i<Math.min(names.length,details.length);i++){
+    athletes.push({name:names[i],...details[i]});
+  }
+  return athletes;
+}
+
+async function fetchPreviewData(listUrl,startwave,onProgress){
+  const qStr=listUrl.includes('?')?listUrl.split('?')[1]:'';
+  const eventCode=new URLSearchParams(qStr).get('event')||'';
+  if(!eventCode) throw new Error('No event code found. Make sure the URL includes &event=…');
+  function pageUrl(p){
+    return `${PROXY_URL}?url=${encodeURIComponent('https://startlist.hyrox.com/?page='+p+'&pid=startlist_list&pidp=upcoming_nav&event='+eventCode)}`;
+  }
+  // Fetch page 1, detect total pages
+  const r1=await fetch(pageUrl(1));
+  if(!r1.ok) throw new Error('Could not reach startlist (proxy error '+r1.status+')');
+  const html1=await r1.text();
+  const athletes1=parseStartlistPage(html1);
+  if(!athletes1.length) throw new Error('No athletes found. Check the URL and event parameter.');
+  // Find last page number from silver-encoded pagination links
+  const silverLinks=[...html1.matchAll(/class='silver-link'>(\d+)<\/a><\/li>/g)];
+  const lastPage=silverLinks.length?parseInt(silverLinks[silverLinks.length-1][1]):1;
+  onProgress&&onProgress(1,lastPage);
+  // Fetch remaining pages in parallel
+  let done=1;
+  const promises=[];
+  for(let p=2;p<=lastPage;p++){
+    promises.push(fetch(pageUrl(p)).then(async r=>{
+      const html=await r.text();
+      done++;
+      onProgress&&onProgress(done,lastPage);
+      return html;
+    }));
+  }
+  const moreHtmls=await Promise.all(promises);
+  const allAthletes=[...athletes1,...moreHtmls.flatMap(parseStartlistPage)];
+  const day=athletes1[0]?.day||'';
+  const waveAthletes=allAthletes.filter(a=>a.wave===startwave||a.wave.includes(startwave));
+  return{day,totalParticipants:allAthletes.length,waveAthletes};
+}
+
+function previewCardHtml(p){
+  const accent=p.color?'accent-'+p.color:'';
+  const targetLine=p.targetSecs>0
+    ?`<div class="hyrox-target-line">Target: ${fmtSecsDisplay(p.targetSecs)}</div>`
+    :`<div class="hyrox-target-line" style="color:var(--muted2)">No target set</div>`;
+  const note=`<div class="card-note">${p.notes||''}</div>`;
+  return `<div class="hyrox-card ${accent}" data-id="${p.id}">
+    <div style="display:flex;align-items:center;margin-bottom:2px">
+      <div class="hyrox-race-name" style="flex:1">${p.title}</div>
+      <div class="card-actions">
+        <button class="card-action-btn preview-detail" data-id="${p.id}" title="Wave detail">👥</button>
+        <button class="card-action-btn del preview-del" data-id="${p.id}" title="Delete">🗑️</button>
+      </div>
+    </div>
+    <div class="hyrox-date">${p.day||'—'}</div>
+    ${targetLine}
+    <div class="preview-meta-row" style="margin-top:8px"><span>Total field</span><span class="preview-meta-val">${p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—'}</span></div>
+    <div class="preview-meta-row"><span>In wave</span><span class="preview-meta-val">${p.waveAthletes?.length??'—'}</span></div>
+    <div style="font-size:10px;color:var(--muted2);font-family:'DM Mono',monospace;margin-top:4px">${p.startwave}</div>
+    ${note}
+  </div>`;
+}
+
+function renderPreviews(){
+  const el=document.getElementById('preview-sections');
+  if(!el) return;
+  const previews=loadAllPreviews();
+  if(!previews.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">No race previews yet — add your first one above.</div>';
+    return;
+  }
+  el.innerHTML=`<div class="race-carousel">${previews.map(previewCardHtml).join('')}</div>`;
+  el.querySelectorAll('.preview-detail').forEach(btn=>{
+    btn.addEventListener('click',e=>{ e.stopPropagation(); openWaveDetail(btn.dataset.id); });
+  });
+  el.querySelectorAll('.preview-del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const p=loadAllPreviews().find(x=>x.id===btn.dataset.id);
+      if(!p||!confirm(`Delete "${p.title}"? This cannot be undone.`)) return;
+      saveAllPreviews(loadAllPreviews().filter(x=>x.id!==btn.dataset.id));
+      renderPreviews();
+    });
+  });
+}
+
+function openWaveDetail(id){
+  const p=loadAllPreviews().find(x=>x.id===id);
+  if(!p) return;
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  document.getElementById('deep-dive').style.display='none';
+  document.getElementById('wave-detail').style.display='block';
+  const athletes=(p.waveAthletes||[]).slice().sort((a,b)=>+a.bib-+b.bib);
+  const rows=athletes.map((a,i)=>{
+    const self=a.name.includes(MY_NAME_FRAGMENT);
+    return `<tr class="${self?'self':''}">
+      <td class="mono">${i+1}</td>
+      <td>${a.name}${self?' ★':''}</td>
+      <td class="mono">${a.bib}</td>
+      <td>${a.age}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('wave-detail-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <div class="dd-title">${p.title}</div>
+    </div>
+    <div class="wave-detail-stats">
+      <div class="metric-card"><div class="metric-label">Day</div><div class="metric-value" style="font-size:16px">${p.day||'—'}</div></div>
+      <div class="metric-card"><div class="metric-label">Total field</div><div class="metric-value">${p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—'}</div></div>
+      <div class="metric-card"><div class="metric-label">In wave</div><div class="metric-value">${athletes.length}</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-family:'DM Mono',monospace">${p.startwave}</div>
+    <div class="table-wrap">
+      <table class="wave-table">
+        <thead><tr><th>#</th><th>Name</th><th>Bib</th><th>Age Group</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4" style="color:var(--muted)">No wave data</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+document.getElementById('wave-detail-back').addEventListener('click',()=>showView('chat'));
+
+// ── Preview modal ─────────────────────────────────────────────────────────────
+let selectedPreviewColor='';
+function setPreviewSwatchColor(color){
+  selectedPreviewColor=color;
+  document.getElementById('pr-color-swatches').querySelectorAll('.color-swatch').forEach(s=>{
+    s.classList.toggle('active',s.dataset.color===color);
+  });
+}
+function openAddPreviewModal(){
+  document.getElementById('pr-url').value='';
+  document.getElementById('pr-wave').value='';
+  document.getElementById('pr-title').value='';
+  document.getElementById('pr-target').value='';
+  document.getElementById('pr-notes').value='';
+  setPreviewSwatchColor('');
+  document.getElementById('add-preview-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeAddPreviewModal(){
+  document.getElementById('add-preview-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.getElementById('open-add-preview-btn').addEventListener('click',openAddPreviewModal);
+document.getElementById('add-preview-close').addEventListener('click',closeAddPreviewModal);
+document.getElementById('add-preview-overlay').addEventListener('click',e=>{if(e.target.id==='add-preview-overlay') closeAddPreviewModal();});
+document.getElementById('pr-color-swatches').querySelectorAll('.color-swatch').forEach(s=>{
+  s.addEventListener('click',()=>setPreviewSwatchColor(s.dataset.color));
+});
+document.getElementById('save-preview').addEventListener('click',async()=>{
+  const url=document.getElementById('pr-url').value.trim();
+  const wave=document.getElementById('pr-wave').value.trim();
+  const title=document.getElementById('pr-title').value.trim();
+  const targetInput=document.getElementById('pr-target').value.trim();
+  const notes=document.getElementById('pr-notes').value.trim();
+  if(!url){ alert('Please enter a Start List URL.'); return; }
+  if(!wave){ alert('Please enter the startwave (e.g. 8:10 HYROX MEN).'); return; }
+  if(!title){ alert('Please enter a title.'); return; }
+  const btn=document.getElementById('save-preview');
+  btn.disabled=true; btn.textContent='Fetching page 1…';
+  try{
+    const data=await fetchPreviewData(url,wave,(done,total)=>{
+      btn.textContent=`Fetching… ${done}/${total}`;
+    });
+    const preview={
+      id:'preview_'+Date.now(),
+      title,url,startwave:wave,
+      targetSecs:parseTargetInput(targetInput),
+      notes,color:selectedPreviewColor,
+      day:data.day,
+      totalParticipants:data.totalParticipants,
+      waveAthletes:data.waveAthletes,
+      addedAt:Date.now()
+    };
+    const previews=loadAllPreviews();
+    previews.unshift(preview);
+    saveAllPreviews(previews);
+    closeAddPreviewModal();
+    renderPreviews();
+  }catch(err){
+    alert('Failed to fetch startlist: '+err.message);
+  }finally{
+    btn.disabled=false; btn.textContent='Fetch & Save';
+  }
+});
+
 // ── Latest view ───────────────────────────────────────────────────────────────
 function daysBetween(d1,d2){
   return Math.round(Math.abs(new Date(d1+'T12:00:00')-new Date(d2+'T12:00:00'))/864e5);
@@ -1741,6 +2020,7 @@ let viewInited={};
 
 function showView(name){
   document.getElementById('deep-dive').style.display='none';
+  document.getElementById('wave-detail').style.display='none';
   document.querySelectorAll('.view').forEach(v=>v.style.display='none');
   const el=document.getElementById('view-'+name);
   if(el) el.style.display='block';
@@ -1750,6 +2030,7 @@ function showView(name){
   if(name==='latest'){ renderLatest(); }
   if(name==='training'&&!viewInited.training){ initTrainingView(); viewInited.training=true; }
   if(name==='races'&&!viewInited.races){ renderRaces(); viewInited.races=true; }
+  if(name==='chat'&&!viewInited.chat){ renderPreviews(); viewInited.chat=true; }
 }
 
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>showView(n.dataset.view)));
