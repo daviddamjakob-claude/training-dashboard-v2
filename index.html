@@ -1726,32 +1726,23 @@ function parseStartlistPage(html){
   return athletes;
 }
 
-function parseAthleteDetail(html){
-  const nameMatch=html.match(/type-fullname[^>]*>(?:<a[^>]*>)?([^<]+)(?:<\/a>)?</i);
-  const name=nameMatch?nameMatch[1].trim():'';
-  const waveMatch=html.match(/Startwave<\/div>\s*([^<\s][^<]*?)\s*<\/div>/i);
-  const wave=waveMatch?waveMatch[1].trim():'';
-  const dayMatch=html.match(/\bDay\b<\/div>\s*([^<\s][^<]*?)\s*<\/div>/i);
-  const day=dayMatch?dayMatch[1].trim():'';
-  const bibMatch=html.match(/Bib no\.<\/div>\s*(\d+)\s*<\/div>/i);
-  const bib=bibMatch?bibMatch[1].trim():'';
-  return{name,wave,day,bib};
-}
-
 async function fetchPreviewData(profileUrl,onProgress){
   const qStr=profileUrl.includes('?')?profileUrl.split('?')[1]:'';
   const params=new URLSearchParams(qStr);
   const eventCode=params.get('event')||params.get('search_event')||'';
-  const athleteId=params.get('idp')||'';
+  const searchName=params.get('search[name]')||'';
   if(!eventCode) throw new Error('Could not find event code in URL. Make sure you paste the full personal profile link.');
-  if(!athleteId) throw new Error('Could not find athlete ID (idp) in URL.');
-  // Fetch athlete detail page to get name + startwave
-  const detailProxyUrl=`${PROXY_URL}?url=${encodeURIComponent('https://startlist.hyrox.com/?content=detail&fpid=startlist_list&pid=startlist_list&idp='+athleteId+'&lang=EN_CAP&event='+eventCode+'&pidp=upcoming_nav')}`;
-  const detailR=await fetch(detailProxyUrl);
-  if(!detailR.ok) throw new Error('Could not load athlete profile ('+detailR.status+')');
-  const detailHtml=await detailR.text();
-  const{name,wave,day:detailDay,bib:selfBib}=parseAthleteDetail(detailHtml);
-  if(!wave) throw new Error('Could not detect your startwave from the profile page. The event may not yet have wave assignments.');
+  if(!searchName) throw new Error('Could not find name in URL (search[name] parameter missing). Make sure you use the "Start List Link Personal Profile" link.');
+  // Search name-filtered page — same HTML format as list pages, already parses correctly
+  const searchProxyUrl=`${PROXY_URL}?url=${encodeURIComponent('https://startlist.hyrox.com/?pid=startlist_list&pidp=upcoming_nav&event='+eventCode+'&search[name]='+encodeURIComponent(searchName))}`;
+  const searchR=await fetch(searchProxyUrl);
+  if(!searchR.ok) throw new Error('Could not search startlist ('+searchR.status+')');
+  const searchHtml=await searchR.text();
+  const selfAthletes=parseStartlistPage(searchHtml);
+  if(!selfAthletes.length) throw new Error('Could not find your entry in the startlist. The event may not yet have wave assignments, or the name in your link doesn\'t match.');
+  const self=selfAthletes[0];
+  const wave=self.wave;
+  if(!wave) throw new Error('Your startlist entry was found but has no wave assigned yet.');
   // Fetch all pages for this event
   function pageUrl(p){
     return `${PROXY_URL}?url=${encodeURIComponent('https://startlist.hyrox.com/?page='+p+'&pid=startlist_list&pidp=upcoming_nav&event='+eventCode)}`;
@@ -1776,9 +1767,9 @@ async function fetchPreviewData(profileUrl,onProgress){
   }
   const moreHtmls=await Promise.all(promises);
   const allAthletes=[...athletes1,...moreHtmls.flatMap(parseStartlistPage)];
-  const day=detailDay||athletes1[0]?.day||'';
+  const day=self.day||athletes1[0]?.day||'';
   const waveAthletes=allAthletes.filter(a=>a.wave===wave||a.wave.includes(wave));
-  return{day,totalParticipants:allAthletes.length,waveAthletes,selfName:name,selfBib,wave};
+  return{day,totalParticipants:allAthletes.length,waveAthletes,selfName:self.name,selfBib:self.bib,wave};
 }
 
 function previewCardHtml(p){
