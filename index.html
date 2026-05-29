@@ -550,8 +550,8 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <div class="race-type-btn" style="opacity:0.4;pointer-events:none">Other Race</div>
       </div>
       <div class="form-field">
-        <label class="form-label">Start List URL *</label>
-        <input class="form-input" id="pr-url" type="url" placeholder="Paste startlist.hyrox.com link (with &event=…)">
+        <label class="form-label">Event Code *</label>
+        <input class="form-input" id="pr-event-code" type="text" placeholder="e.g. H_LR3MS4JI1638" style="font-family:'DM Mono',monospace;font-size:13px">
       </div>
       <div class="form-field">
         <label class="form-label">Startwave *</label>
@@ -582,7 +582,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         </div>
       </div>
       <button class="btn-orange" id="save-preview">Fetch &amp; Save</button>
-      <div class="form-note">Paste the startlist.hyrox.com URL including the <code>&amp;event=…</code> parameter — your wave will be fetched and stored automatically.</div>
+      <div class="form-note">Enter the Hyrox event code (found in the startlist URL after <code>&amp;event=</code>) — your wave will be fetched and stored automatically.</div>
     </div>
   </div>
 </div>
@@ -1730,10 +1730,8 @@ function parseStartlistPage(html){
   return athletes;
 }
 
-async function fetchPreviewData(listUrl,startwave,onProgress){
-  const qStr=listUrl.includes('?')?listUrl.split('?')[1]:'';
-  const eventCode=new URLSearchParams(qStr).get('event')||'';
-  if(!eventCode) throw new Error('No event code found. Make sure the URL includes &event=…');
+async function fetchPreviewData(eventCode,startwave,onProgress){
+  if(!eventCode) throw new Error('No event code provided.');
   function pageUrl(p){
     return `${PROXY_URL}?url=${encodeURIComponent('https://startlist.hyrox.com/?page='+p+'&pid=startlist_list&pidp=upcoming_nav&event='+eventCode)}`;
   }
@@ -1855,7 +1853,7 @@ function setPreviewSwatchColor(color){
   });
 }
 function openAddPreviewModal(){
-  document.getElementById('pr-url').value='';
+  document.getElementById('pr-event-code').value='';
   document.getElementById('pr-wave').value='';
   document.getElementById('pr-title').value='';
   document.getElementById('pr-target').value='';
@@ -1875,23 +1873,23 @@ document.getElementById('pr-color-swatches').querySelectorAll('.color-swatch').f
   s.addEventListener('click',()=>setPreviewSwatchColor(s.dataset.color));
 });
 document.getElementById('save-preview').addEventListener('click',async()=>{
-  const url=document.getElementById('pr-url').value.trim();
+  const eventCode=document.getElementById('pr-event-code').value.trim().toUpperCase();
   const wave=document.getElementById('pr-wave').value.trim();
   const title=document.getElementById('pr-title').value.trim();
   const targetInput=document.getElementById('pr-target').value.trim();
   const notes=document.getElementById('pr-notes').value.trim();
-  if(!url){ alert('Please enter a Start List URL.'); return; }
+  if(!eventCode){ alert('Please enter the event code.'); return; }
   if(!wave){ alert('Please enter the startwave (e.g. 8:10 HYROX MEN).'); return; }
   if(!title){ alert('Please enter a title.'); return; }
   const btn=document.getElementById('save-preview');
   btn.disabled=true; btn.textContent='Fetching page 1…';
   try{
-    const data=await fetchPreviewData(url,wave,(done,total)=>{
+    const data=await fetchPreviewData(eventCode,wave,(done,total)=>{
       btn.textContent=`Fetching… ${done}/${total}`;
     });
     const preview={
       id:'preview_'+Date.now(),
-      title,url,startwave:wave,
+      title,eventCode,startwave:wave,
       targetSecs:parseTargetInput(targetInput),
       notes,color:selectedPreviewColor,
       day:data.day,
