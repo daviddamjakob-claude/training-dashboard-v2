@@ -326,8 +326,8 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 /* Wave detail page */
 .wave-detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .wave-table{width:100%;border-collapse:collapse}
-.wave-table th{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);padding:10px 12px;text-align:left;font-weight:500;background:var(--surface2);white-space:nowrap}
-.wave-table td{padding:9px 12px;font-size:13px;border-top:1px solid var(--border);white-space:nowrap}
+.wave-table th{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);padding:7px 8px;text-align:left;font-weight:500;background:var(--surface2);white-space:nowrap}
+.wave-table td{padding:6px 8px;font-size:12px;border-top:1px solid var(--border);white-space:nowrap}
 .wave-table tr.self td{font-weight:600;color:#b45309}
 .wave-table tr.self{background:linear-gradient(90deg,#fff7ed,var(--surface))}
 .wave-athlete-name{cursor:pointer;transition:color 0.12s}
@@ -397,6 +397,9 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 
     <!-- Latest -->
     <div id="view-latest" class="view">
+      <div class="races-add-row">
+        <button class="btn-add-race" style="opacity:0.45;cursor:default" disabled>No functionality yet</button>
+      </div>
       <div class="races-title">Latest 5 Workouts</div>
       <div id="latest-list"></div>
       <div class="races-title" style="margin-top:20px">Assessment</div>
@@ -2102,11 +2105,12 @@ function openWaveDetail(id){
       const self=selfName&&a.name.toLowerCase()===selfName.toLowerCase();
       const s=statsMap?.[a.name]; // undefined=loading, null=no profile, obj=data
       const loading=statsMap===null;
-      const cell=val=>loading?`<td class="mono" style="color:var(--muted2)">…</td>`:`<td class="mono">${val||'—'}</td>`;
+      const cell=val=>loading?`<td style="color:var(--muted2)">…</td>`:`<td>${val||'—'}</td>`;
+      const bibTag=a.bib?`<span style="color:var(--muted2);font-size:10px;margin-right:4px">#${a.bib}</span>`:'';
       return `<tr class="${self?'self':''}">
-        <td class="mono">${i+1}</td>
-        <td class="wave-athlete-name" data-name="${a.name}">${fmtHyroxName(a.name)}${self?' ★':''}</td>
-        <td style="font-size:12px">${a.age}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted2)">${i+1}</td>
+        <td class="wave-athlete-name" data-name="${a.name}">${bibTag}${fmtHyroxName(a.name)}${self?' ★':''}</td>
+        <td>${a.age}</td>
         ${cell(s?.singlePB)}
         ${cell(s?.doublesPB)}
         ${cell(s?.totalRaces)}
