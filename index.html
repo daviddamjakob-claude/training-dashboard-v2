@@ -1892,28 +1892,69 @@ function nameToHyresultSlug(hyroxName){
     .replace(/\s+/g,'-');
 }
 
+function timeToSecs(t){
+  if(!t) return Infinity;
+  const p=t.split(':').map(Number);
+  return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];
+}
+function bestTime(raceList){
+  if(!raceList||!raceList.length) return null;
+  return raceList.reduce((b,r)=>timeToSecs(r.time)<timeToSecs(b.time)?r:b).time;
+}
+
 function parseHyresultHtml(html){
-  // Summary: "N races, N divisions…"
-  const summaryMatch=html.match(/(\d+)\s+race/i);
-  const totalRaces=summaryMatch?summaryMatch[1]:'?';
-  const statusMatch=html.match(/(HYROX (?:PRO|OPEN|ELITE)[^<"]*)/i);
-  const status=statusMatch?statusMatch[1].trim():'';
+  // Strip ALL tags first so summary text like "7</span> races" becomes "7 races"
+  const plain=html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+  const countMatch=plain.match(/(\d+)\s*race/i);
+  const totalRaces=countMatch?parseInt(countMatch[1]):0;
   // Race rows: <a href="/result/ID">…</a>
   const races=[];
   for(const m of html.matchAll(/href="\/result\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)){
     const text=m[2].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
     const time=text.match(/(\d+:\d{2}:\d{2})/)?.[1]||'';
-    const rank=text.match(/#(\d+)/)?.[1]||'';
+    const rank=text.match(/#\s*(\d+)/)?.[1]||''; // space allowed after #
     const event=text.match(/(HYROX\s+[\w\s]+?\s+20\d{2})/i)?.[0]?.trim()||'';
-    const divMatch=text.match(/((?:PRO\s+)?(?:DOUBLES\s+)?(?:MEN|WOMEN)[^+\d]*\d{2}-\d{2})/i);
+    const divMatch=text.match(/((?:PRO\s+)?(?:DOUBLES\s+)?(?:MIXED\s+)?(?:MEN|WOMEN)[^+\d]*\d{2}-\d{2})/i);
     const division=divMatch?divMatch[1].trim():'';
-    const partner=text.match(/\+\s*([A-Za-zÀ-ž\s]+)$/)?.[1]?.trim()||'';
+    const partner=text.match(/\+\s*([A-Za-zÀ-ž\s-]+)$/)?.[1]?.trim()||'';
     if(time&&event) races.push({id:m[1],time,rank,event,division,partner});
   }
-  return{races,totalRaces,status};
+  return{races,totalRaces};
 }
 
 let currentWaveDetailId=null;
+const _waveStatsCache={};
+
+async function fetchWaveStats(athletes,onProgress){
+  const batchSize=5;
+  const statsMap={};
+  let done=0;
+  for(let i=0;i<athletes.length;i+=batchSize){
+    const batch=athletes.slice(i,i+batchSize);
+    await Promise.all(batch.map(async a=>{
+      if(_waveStatsCache[a.name]!==undefined){
+        statsMap[a.name]=_waveStatsCache[a.name];
+        onProgress&&onProgress(++done,athletes.length);
+        return;
+      }
+      const slug=nameToHyresultSlug(a.name);
+      try{
+        const r=await fetch(`https://www.hyresult.com/athlete/${slug}`);
+        if(!r.ok){ statsMap[a.name]=null; _waveStatsCache[a.name]=null; }
+        else{
+          const html=await r.text();
+          const{races,totalRaces}=parseHyresultHtml(html);
+          const singles=races.filter(r=>!r.division.toLowerCase().includes('doubles'));
+          const doubles=races.filter(r=>r.division.toLowerCase().includes('doubles'));
+          const stat={totalRaces,singlePB:bestTime(singles)||null,doublesPB:bestTime(doubles)||null};
+          statsMap[a.name]=stat; _waveStatsCache[a.name]=stat;
+        }
+      }catch(e){ statsMap[a.name]=null; _waveStatsCache[a.name]=null; }
+      onProgress&&onProgress(++done,athletes.length);
+    }));
+  }
+  return statsMap;
+}
 
 async function openAthleteDetail(athleteName){
   const slug=nameToHyresultSlug(athleteName);
@@ -1937,13 +1978,16 @@ async function openAthleteDetail(athleteName){
       return;
     }
     const html=await r.text();
-    const{races,totalRaces,status}=parseHyresultHtml(html);
-    const pb=races.filter(r=>r.division&&!r.division.toUpperCase().includes('DOUBLES')).sort((a,b)=>a.time.localeCompare(b.time))[0]?.time||'—';
+    const{races,totalRaces}=parseHyresultHtml(html);
+    const singles=races.filter(r=>!r.division.toLowerCase().includes('doubles'));
+    const doubles=races.filter(r=>r.division.toLowerCase().includes('doubles'));
+    const singlePB=bestTime(singles)||'—';
+    const doublesPB=bestTime(doubles)||'—';
     const rows=races.map(r=>`<tr>
       <td>${r.event}</td>
       <td style="font-size:12px;color:var(--muted)">${r.division}${r.partner?` <span style="color:var(--muted2)">+ ${r.partner}</span>`:''}</td>
       <td class="mono">${r.time}</td>
-      <td class="mono" style="color:var(--muted)">#${r.rank}</td>
+      <td class="mono" style="color:var(--muted)">${r.rank?'#'+r.rank:'—'}</td>
     </tr>`).join('');
     document.getElementById('athlete-detail-content').innerHTML=`
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
@@ -1951,9 +1995,9 @@ async function openAthleteDetail(athleteName){
         <a href="${profileUrl}" target="_blank" rel="noopener" class="hyresult-link">hyresult.com ↗</a>
       </div>
       <div class="athlete-summary">
-        <div class="metric-card"><div class="metric-label">Races</div><div class="metric-value">${totalRaces}</div></div>
-        <div class="metric-card"><div class="metric-label">Singles PB</div><div class="metric-value" style="font-size:17px">${pb}</div></div>
-        <div class="metric-card"><div class="metric-label">Status</div><div class="metric-value" style="font-size:13px;line-height:1.3">${status||'—'}</div></div>
+        <div class="metric-card"><div class="metric-label">Races</div><div class="metric-value">${totalRaces||'—'}</div></div>
+        <div class="metric-card"><div class="metric-label">Singles PB</div><div class="metric-value" style="font-size:17px">${singlePB}</div></div>
+        <div class="metric-card"><div class="metric-label">Doubles PB</div><div class="metric-value" style="font-size:17px">${doublesPB}</div></div>
       </div>
       <div class="table-wrap">
         <table class="wave-table">
@@ -1980,17 +2024,31 @@ function openWaveDetail(id){
   document.getElementById('athlete-detail').style.display='none';
   document.getElementById('wave-detail').style.display='block';
   const selfName=p.selfName||'';
-  const athletes=(p.waveAthletes||[]).slice().sort((a,b)=>+a.bib-+b.bib);
-  const rows=athletes.map((a,i)=>{
-    const self=selfName&&a.name.toLowerCase()===selfName.toLowerCase();
-    return `<tr class="${self?'self':''}">
-      <td class="mono">${i+1}</td>
-      <td class="wave-athlete-name" data-name="${a.name}">${fmtHyroxName(a.name)}${self?' ★':''}</td>
-      <td class="mono">${a.bib}</td>
-      <td>${a.age}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('wave-detail-content').innerHTML=`
+  const athletes=(p.waveAthletes||[]).slice();
+
+  function buildRows(sorted,statsMap){
+    return sorted.map((a,i)=>{
+      const self=selfName&&a.name.toLowerCase()===selfName.toLowerCase();
+      const s=statsMap?.[a.name]; // undefined=loading, null=no profile, obj=data
+      const loading=statsMap===null;
+      const cell=val=>loading?`<td class="mono" style="color:var(--muted2)">…</td>`:`<td class="mono">${val||'—'}</td>`;
+      return `<tr class="${self?'self':''}">
+        <td class="mono">${i+1}</td>
+        <td class="wave-athlete-name" data-name="${a.name}">${fmtHyroxName(a.name)}${self?' ★':''}</td>
+        <td style="font-size:12px">${a.age}</td>
+        ${cell(s?.singlePB)}
+        ${cell(s?.doublesPB)}
+        ${cell(s?.totalRaces)}
+      </tr>`;
+    }).join('');
+  }
+
+  const contentEl=document.getElementById('wave-detail-content');
+  const tbodyId='wave-tbody-'+id;
+
+  // Initial render sorted by bib, stats loading
+  const initial=athletes.slice().sort((a,b)=>+a.bib-+b.bib);
+  contentEl.innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
       <div class="dd-title">${p.title}</div>
     </div>
@@ -1999,15 +2057,37 @@ function openWaveDetail(id){
       <div class="metric-card"><div class="metric-label">Total field</div><div class="metric-value">${p.totalParticipants!=null?p.totalParticipants.toLocaleString():'—'}</div></div>
       <div class="metric-card"><div class="metric-label">In wave</div><div class="metric-value">${athletes.length}</div></div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-family:'DM Mono',monospace">${p.startwave}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace">${p.startwave}</div>
+    <div id="wave-stats-note" style="font-size:11px;color:var(--muted2);margin-bottom:10px">Loading stats (0/${athletes.length})…</div>
     <div class="table-wrap">
       <table class="wave-table">
-        <thead><tr><th>#</th><th>Name</th><th>Bib</th><th>Age Group</th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="4" style="color:var(--muted)">No wave data</td></tr>'}</tbody>
+        <thead><tr><th>#</th><th>Name</th><th>Age</th><th>Single PB</th><th>Doubles PB</th><th>Races</th></tr></thead>
+        <tbody id="${tbodyId}">${buildRows(initial,null)}</tbody>
       </table>
     </div>`;
-  document.getElementById('wave-detail-content').querySelectorAll('.wave-athlete-name').forEach(td=>{
-    td.addEventListener('click',()=>openAthleteDetail(td.dataset.name));
+
+  function wireClicks(tbody){
+    tbody.querySelectorAll('.wave-athlete-name').forEach(td=>{
+      td.addEventListener('click',()=>openAthleteDetail(td.dataset.name));
+    });
+  }
+  wireClicks(contentEl.querySelector(`#${tbodyId}`));
+
+  // Fetch stats in background; resort and re-render when done
+  fetchWaveStats(athletes,(done,total)=>{
+    const note=document.getElementById('wave-stats-note');
+    if(note) note.textContent=`Loading stats (${done}/${total})…`;
+  }).then(statsMap=>{
+    const tbody=document.getElementById(tbodyId);
+    const note=document.getElementById('wave-stats-note');
+    if(!tbody) return;
+    if(note) note.style.display='none';
+    const sorted=athletes.slice().sort((a,b)=>{
+      const sa=statsMap[a.name]?.singlePB, sb=statsMap[b.name]?.singlePB;
+      return timeToSecs(sa)-timeToSecs(sb);
+    });
+    tbody.innerHTML=buildRows(sorted,statsMap);
+    wireClicks(tbody);
   });
 }
 document.getElementById('wave-detail-back').addEventListener('click',()=>showView('chat'));
